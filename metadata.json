@@ -1,0 +1,6 @@
+{
+  "name": "CrediManage POS",
+  "description": "Sistema de Punto de Venta (POS) - Módulo de Gestión de Clientes, Crédito y Estados de Cuenta",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
