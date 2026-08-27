@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://credimanage-vdq7ahdckq-rj.a.run.app/crediApi/:path*"
+    },
+    {
       "source": "/((?!assets/|favicon.ico|manifest.json).*)",
       "destination": "/index.html"
     }

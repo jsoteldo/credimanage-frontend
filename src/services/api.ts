@@ -14,7 +14,7 @@ export const getAuthToken = (): string | null => localStorage.getItem(TOKEN_KEY)
 export const setAuthToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
 export const removeAuthToken = () => localStorage.removeItem(TOKEN_KEY);
 
-const BASE_URL = (import.meta as any).env?.VITE_API_URL || 'https://credimanage-vdq7ahdckq-rj.a.run.app/crediApi';
+const BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
@@ -27,6 +27,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  // Use base URL (relative by default, allowing local Vite proxy or Vercel rewrites to handle the proxying)
   const url = endpoint.startsWith('/api')
     ? `${BASE_URL}${endpoint.replace(/^\/api/, '')}`
     : `${BASE_URL}${endpoint}`;
