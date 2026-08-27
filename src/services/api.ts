@@ -14,6 +14,8 @@ export const getAuthToken = (): string | null => localStorage.getItem(TOKEN_KEY)
 export const setAuthToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
 export const removeAuthToken = () => localStorage.removeItem(TOKEN_KEY);
 
+const BASE_URL = (import.meta as any).env?.VITE_API_URL || 'https://credimanage-vdq7ahdckq-rj.a.run.app/crediApi';
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers: Record<string, string> = {
@@ -25,7 +27,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(endpoint, {
+  const url = endpoint.startsWith('/api')
+    ? `${BASE_URL}${endpoint.replace(/^\/api/, '')}`
+    : `${BASE_URL}${endpoint}`;
+
+  const res = await fetch(url, {
     ...options,
     headers,
   });

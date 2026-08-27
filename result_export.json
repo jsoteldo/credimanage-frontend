@@ -1,0 +1,30 @@
+[
+ {
+  "id": "usr-1",
+  "name": "Carlos Mendoza",
+  "email": "admin@credimanage.pos",
+  "password": "$2b$10$2ydcAQAhIsdGnmESQEYn/ObdY2yN1c2xcIx1fyvEg/HGCjUPVdk/G",
+  "role": "Administrador",
+  "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150",
+  "active": true,
+  "createdAt": "2026-01-01 08:00:00",
+  "updatedAt": "2026-08-20 16:43:55.606",
+  "approved": true,
+  "approvedAt": null,
+  "approvedBy": null
+ },
+ {
+  "id": "usr-2",
+  "name": "Sof\u00eda Castro (Cajera)",
+  "email": "cajero@credimanage.pos",
+  "password": "$2b$10$svlVraoQQcGn5qSvTvIkXOETEqKGfUfGNUs4gUBafGMawDAgG6usC",
+  "role": "Cajero",
+  "avatar": "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=150",
+  "active": true,
+  "createdAt": "2026-01-15 09:30:00",
+  "updatedAt": "2026-08-20 16:43:55.613",
+  "approved": true,
+  "approvedAt": null,
+  "approvedBy": null
+ }
+]

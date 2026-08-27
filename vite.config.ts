@@ -21,7 +21,7 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          target: 'https://credimanage-vdq7ahdckq-rj.a.run.app',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, '/crediApi'),
         },
