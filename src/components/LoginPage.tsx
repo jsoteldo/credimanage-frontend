@@ -11,8 +11,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onLoginSuccess,
   onNavigateToRegister,
 }) => {
-  const [email, setEmail] = useState('admin@credimanage.pos');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,11 +30,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
   };
 
   return (
@@ -94,24 +89,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </button>
         </form>
 
-        {/* Quick Demo Accs */}
-        <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200/60 text-xs">
-          <p className="font-bold text-[10px] text-slate-500 mb-2 uppercase tracking-wider">Cuentas Demo Rápidas:</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => handleQuickLogin('admin@credimanage.pos', 'admin123')}
-              className="py-1.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 rounded-lg font-bold text-[10px] cursor-pointer transition-colors"
-            >
-              Administrador
-            </button>
-            <button
-              onClick={() => handleQuickLogin('cajero@credimanage.pos', 'cajero123')}
-              className="py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200/80 rounded-lg font-bold text-[10px] cursor-pointer transition-colors"
-            >
-              Cajero
-            </button>
-          </div>
-        </div>
+
 
         <div className="mt-8 pt-4 border-t border-slate-100 text-center">
           <p className="text-slate-500 font-medium text-xs">

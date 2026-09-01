@@ -13,8 +13,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onClose,
   onLoginSuccess,
 }) => {
-  const [email, setEmail] = useState('admin@credimanage.pos');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,11 +35,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
   };
 
   return (
@@ -80,7 +75,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@credimanage.pos"
+              placeholder="correo@ejemplo.com"
               className="w-full h-10 px-sm border border-outline-variant rounded bg-surface-bright font-data-mono text-body-md"
             />
           </div>
@@ -95,27 +90,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               placeholder="••••••••"
               className="w-full h-10 px-sm border border-outline-variant rounded bg-surface-bright font-data-mono text-body-md"
             />
-          </div>
-
-          {/* Quick Login Buttons */}
-          <div className="p-sm bg-surface-container-low rounded border border-outline-variant space-y-xs">
-            <p className="font-label-md text-[11px] text-secondary font-bold">CUENTAS DEMO RÁPIDAS:</p>
-            <div className="flex gap-sm">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin@credimanage.pos', 'admin123')}
-                className="flex-1 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded font-label-md text-[11px] font-bold cursor-pointer transition-colors"
-              >
-                1-Click Administrador
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('cajero@credimanage.pos', 'cajero123')}
-                className="flex-1 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded font-label-md text-[11px] font-bold cursor-pointer transition-colors"
-              >
-                1-Click Cajero
-              </button>
-            </div>
           </div>
 
           <div className="pt-md border-t border-outline-variant flex justify-end gap-sm">
