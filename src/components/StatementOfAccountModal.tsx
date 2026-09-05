@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Client, CreditPurchase, Payment, User, LoanCredit } from '../types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Client, CreditPurchase, Payment, LoanCredit, User } from '../types';
 import { api } from '../services/api';
-import { LoanScheduleModal } from './LoanScheduleModal';
 import { formatCurrency, formatSpanishDate } from '../utils/loanCalculations';
 
 interface StatementOfAccountModalProps {
@@ -9,7 +8,11 @@ interface StatementOfAccountModalProps {
   onClose: () => void;
   client: Client | null;
   currentUser: User | null;
-  onOpenPaymentModal: (client: Client, isFullPayoff: boolean) => void;
+  onOpenPaymentModal: (
+    client: Client,
+    isFullPayoff: boolean,
+    options?: { mode: 'dailyDebt' | 'bankLoan'; targetLoan?: LoanCredit }
+  ) => void;
   onOpenAddDebtModal?: (client: Client) => void;
   onRefreshData: () => void;
 }
@@ -34,9 +37,6 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Selected loan for viewing schedule
-  const [selectedLoanForSchedule, setSelectedLoanForSchedule] = useState<LoanCredit | null>(null);
-
   // New Credit Purchase Modal state
   const [showAddPurchaseModal, setShowAddPurchaseModal] = useState(false);
   const [productName, setProductName] = useState('');
@@ -44,14 +44,13 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
   const [quantity, setQuantity] = useState<number>(1);
   const [ticketNumber, setTicketNumber] = useState('');
   const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const purchaseSubmittingRef = useRef(false);
 
   // Annul payment state
   const [annulPaymentId, setAnnulPaymentId] = useState<string | null>(null);
   const [annulReason, setAnnulReason] = useState('');
-
-  // Annul loan state
-  const [annulLoanId, setAnnulLoanId] = useState<string | null>(null);
-  const [annulLoanReason, setAnnulLoanReason] = useState('');
+  const [annulLoading, setAnnulLoading] = useState(false);
+  const annulSubmittingRef = useRef(false);
 
   const loadStatement = async () => {
     if (!client) return;
@@ -72,16 +71,30 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
       loadStatement();
     } else {
       setStatementData(null);
-      setSelectedLoanForSchedule(null);
     }
   }, [isOpen, client]);
 
+  const activeLoans = useMemo(() => {
+    return (statementData?.loans || []).filter(
+      (l) => l.status === 'Activo' || l.status === 'Vencido' || (l.pendingAmount ?? 0) > 0.01
+    );
+  }, [statementData?.loans]);
+
   if (!isOpen || !client) return null;
+
+  const currentClient = client || statementData?.client;
+  const availableCredit =
+    currentClient.availableCredit != null
+      ? currentClient.availableCredit
+      : currentClient.creditLimit > 0
+      ? Math.max(0, currentClient.creditLimit - (currentClient.creditExposure ?? currentClient.currentBalance))
+      : 'Sin límite';
 
   const handleCreatePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productName.trim() || !unitPrice) return;
+    if (purchaseSubmittingRef.current || !productName.trim() || !unitPrice) return;
 
+    purchaseSubmittingRef.current = true;
     setPurchaseLoading(true);
     try {
       await api.addCreditPurchase(client.id, {
@@ -100,13 +113,16 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
     } catch (err: any) {
       alert(err.message || 'Error al registrar la compra a crédito');
     } finally {
+      purchaseSubmittingRef.current = false;
       setPurchaseLoading(false);
     }
   };
 
   const handleAnnulPayment = async () => {
-    if (!annulPaymentId || !annulReason.trim()) return;
+    if (annulSubmittingRef.current || !annulPaymentId || !annulReason.trim()) return;
 
+    annulSubmittingRef.current = true;
+    setAnnulLoading(true);
     try {
       await api.annulPayment(annulPaymentId, annulReason.trim());
       setAnnulPaymentId(null);
@@ -115,26 +131,11 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
       onRefreshData();
     } catch (err: any) {
       alert(err.message || 'Error al anular abono');
+    } finally {
+      annulSubmittingRef.current = false;
+      setAnnulLoading(false);
     }
   };
-
-  const handleAnnulLoan = async () => {
-    if (!annulLoanId || !annulLoanReason.trim()) return;
-
-    try {
-      await api.annulLoan(annulLoanId, annulLoanReason.trim());
-      setAnnulLoanId(null);
-      setAnnulLoanReason('');
-      await loadStatement();
-      onRefreshData();
-    } catch (err: any) {
-      alert(err.message || 'Error al anular crédito');
-    }
-  };
-
-  const currentClient = statementData?.client || client;
-  const availableCredit = statementData?.availableCredit ?? (currentClient.creditLimit - currentClient.currentBalance);
-  const clientLoans = statementData?.loans || [];
 
   return (
     <>
@@ -158,6 +159,8 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-slate-600 cursor-pointer p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+              title="Cerrar modal"
+              aria-label="Cerrar modal"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
@@ -175,42 +178,67 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
                 <p className="text-[11px] text-slate-500 font-medium">{currentClient.phone || 'Sin teléfono'}</p>
               </div>
 
-              {/* Current Balance */}
+              {/* Current Daily Debt */}
               <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                  SALDO ACTUAL PENDIENTE
+                  DEUDA CORRIENTE (TIENDA)
                 </p>
                 <p
                   className={`font-mono font-extrabold text-base ${
-                    currentClient.currentBalance > 0 ? 'text-rose-600' : 'text-indigo-600'
+                    (currentClient.dailyDebtBalance ?? 0) > 0
+                      ? 'text-rose-600'
+                      : (currentClient.dailyDebtBalance ?? 0) < 0
+                      ? 'text-blue-600'
+                      : 'text-emerald-600'
                   }`}
                 >
-                  S/ {currentClient.currentBalance.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  {(currentClient.dailyDebtBalance ?? 0) < 0
+                    ? `-S/ ${Math.abs(currentClient.dailyDebtBalance).toFixed(2)} (A favor)`
+                    : formatCurrency(currentClient.dailyDebtBalance ?? 0)}
                 </p>
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  Consumos directos en cuenta
+                </span>
               </div>
 
-              {/* Credit Limit */}
+              {/* Bank Debt Aggregate */}
               <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                  LÍMITE DE CRÉDITO
+                  DEUDA BANCARIA (PRÉSTAMOS)
                 </p>
-                <p className="font-mono font-bold text-base text-slate-900">
-                  {currentClient.creditLimit > 0
-                    ? `S/ ${currentClient.creditLimit.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`
-                    : 'Sin Límite'}
+                <p
+                  className={`font-mono font-extrabold text-base ${
+                    (currentClient.bankDebtBalance ?? 0) > 0 ? 'text-indigo-600' : 'text-slate-700'
+                  }`}
+                >
+                  {formatCurrency(currentClient.bankDebtBalance ?? 0)}
                 </p>
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  {activeLoans.length} {activeLoans.length === 1 ? 'préstamo activo' : 'préstamos activos'}
+                </span>
               </div>
 
-              {/* Available Credit */}
+              {/* Total Consolidated Balance */}
               <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                  CRÉDITO DISPONIBLE
+                  SALDO TOTAL CONSOLIDADO
                 </p>
-                <p className="font-mono font-bold text-base text-indigo-600">
-                  {typeof availableCredit === 'number'
-                    ? `S/ ${availableCredit.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`
-                    : availableCredit}
+                <p
+                  className={`font-mono font-extrabold text-base ${
+                    currentClient.currentBalance > 0
+                      ? 'text-rose-600'
+                      : currentClient.currentBalance < 0
+                      ? 'text-blue-600'
+                      : 'text-emerald-600'
+                  }`}
+                >
+                  {currentClient.currentBalance < 0
+                    ? `-S/ ${Math.abs(currentClient.currentBalance).toFixed(2)} (A favor)`
+                    : formatCurrency(currentClient.currentBalance)}
                 </p>
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  Disp: {typeof availableCredit === 'number' ? formatCurrency(availableCredit) : availableCredit}
+                </span>
               </div>
             </div>
 
@@ -218,19 +246,11 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
             <div className="flex flex-wrap gap-2 justify-between items-center">
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => onOpenPaymentModal(currentClient, false)}
+                  onClick={() => onOpenPaymentModal(currentClient, false, { mode: 'dailyDebt' })}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                 >
                   <span className="material-symbols-outlined text-[18px]">payments</span>
-                  Registrar Abono
-                </button>
-
-                <button
-                  onClick={() => onOpenPaymentModal(currentClient, true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                >
-                  <span className="material-symbols-outlined text-[18px]">done_all</span>
-                  Liquidar Adeudo
+                  Abonar Deuda Corriente
                 </button>
 
                 {onOpenAddDebtModal && (
@@ -276,8 +296,8 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
                   : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
-              <span className="material-symbols-outlined text-[18px]">finance_mode</span>
-              Créditos con Intereses ({clientLoans.length})
+              <span className="material-symbols-outlined text-[18px]">account_balance</span>
+              Préstamos Bancarios ({statementData?.loans?.length || 0})
             </button>
 
             <button
@@ -379,15 +399,15 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
                           <td className="py-2.5 px-4 font-mono text-center text-slate-700 font-medium">
                             {purchase.quantity}
                           </td>
-                          <td className="py-2.5 px-4 font-mono text-right font-extrabold text-rose-600">
+                          <td className="py-2.5 px-4 font-mono text-right font-extrabold text-slate-900">
                             S/ {purchase.amount.toFixed(2)}
                           </td>
                           <td className="py-2.5 px-4 text-slate-500 font-medium">{purchase.registeredBy}</td>
                           <td className="py-2.5 px-4 text-center">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] ${
                                 purchase.status === 'Activo'
-                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200'
                                   : 'bg-slate-100 text-slate-400 line-through'
                               }`}
                             >
@@ -401,89 +421,59 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
                 </table>
               </div>
             ) : activeTab === 'loans' ? (
-              /* Tab 2: Créditos con Intereses */
-              <div className="space-y-4">
-                {clientLoans.length === 0 ? (
-                  <div className="p-12 text-center text-slate-400 border border-slate-200/80 rounded-2xl">
-                    <span className="material-symbols-outlined text-[36px] text-slate-300">finance_mode</span>
-                    <p className="mt-2 text-xs font-semibold text-slate-600">
-                      No hay créditos con intereses registrados para este cliente.
-                    </p>
-                    {onOpenAddDebtModal && (
-                      <button
-                        onClick={() => onOpenAddDebtModal(currentClient)}
-                        className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">percent</span>
-                        <span>Otorgar Crédito con Intereses</span>
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto border border-slate-200/80 rounded-2xl">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-100">
-                          <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500">
-                            Código / Fecha
-                          </th>
-                          <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
-                            Capital
-                          </th>
-                          <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
-                            Interés
-                          </th>
-                          <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
-                            Total Crédito
-                          </th>
-                          <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">
-                            Plan Cuotas
-                          </th>
-                          <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
-                            Valor Cuota
-                          </th>
-                          <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">
-                            Estado
-                          </th>
-                          <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
-                            Acciones
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-xs">
-                        {clientLoans.map((loan) => (
+              /* Tab 2: Préstamos Bancarios Activos e Históricos */
+              <div className="overflow-x-auto border border-slate-200/80 rounded-2xl">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500">Código</th>
+                      <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500">Fecha</th>
+                      <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
+                        Monto Total
+                      </th>
+                      <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
+                        Saldo Pendiente
+                      </th>
+                      <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">
+                        Estado
+                      </th>
+                      <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
+                        Acciones de Abono
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {!statementData?.loans || statementData.loans.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-400 text-sm font-medium">
+                          No hay préstamos bancarios registrados para este cliente.
+                        </td>
+                      </tr>
+                    ) : (
+                      statementData.loans.map((loan) => {
+                        const isPayable = (loan.status === 'Activo' || loan.status === 'Vencido') && (loan.pendingAmount ?? 0) > 0.01;
+                        return (
                           <tr key={loan.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3 px-4 font-mono font-bold text-indigo-700 whitespace-nowrap">
+                              {loan.code}
+                            </td>
                             <td className="py-3 px-4 whitespace-nowrap">
-                              <div className="font-mono font-extrabold text-indigo-700">{loan.code}</div>
-                              <div className="text-[11px] text-slate-500 font-medium">
-                                {formatSpanishDate(loan.date)}
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono text-slate-900 font-bold whitespace-nowrap">
-                              {formatCurrency(loan.capital)}
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono text-indigo-600 font-semibold whitespace-nowrap">
-                              +{formatCurrency(loan.interestAmount)} ({loan.interestRate}%)
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono font-extrabold text-rose-600 text-sm whitespace-nowrap">
-                              {formatCurrency(loan.totalAmount)}
-                            </td>
-                            <td className="py-3 px-4 text-center whitespace-nowrap">
                               <span className="font-semibold text-slate-800">
+                                {formatSpanishDate(loan.date)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 font-mono text-right text-slate-700 whitespace-nowrap">
+                              {formatCurrency(loan.totalAmount)}
+                              <span className="block text-[10px] text-slate-400">
                                 {loan.installmentsCount} cuotas ({loan.frequency})
                               </span>
-                              {loan.paidInstallmentsCount !== undefined && loan.paidInstallmentsCount > 0 && (
-                                <div className="text-[10px] text-emerald-600 font-bold">
-                                  {loan.paidInstallmentsCount}/{loan.installmentsCount} pagadas
-                                </div>
-                              )}
                             </td>
-                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
-                              {formatCurrency(loan.installmentAmount)}
+                            <td className="py-3 px-4 font-mono text-right font-extrabold text-rose-600 whitespace-nowrap">
+                              {formatCurrency(loan.pendingAmount)}
                             </td>
                             <td className="py-3 px-4 text-center whitespace-nowrap">
                               <span
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                   loan.status === 'Activo'
                                     ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                                     : loan.status === 'Pagado'
@@ -497,42 +487,50 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
                               </span>
                             </td>
                             <td className="py-3 px-4 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => setSelectedLoanForSchedule(loan)}
-                                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                                  title="Ver cronograma detallado de cuotas"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">calendar_month</span>
-                                  <span>Cronograma</span>
-                                </button>
-
-                                {currentUser?.role === 'Administrador' && loan.status === 'Activo' && (
+                              {isPayable ? (
+                                <div className="flex justify-end items-center gap-2">
                                   <button
-                                    onClick={() => setAnnulLoanId(loan.id)}
-                                    className="text-rose-600 hover:text-rose-700 hover:underline text-xs font-bold cursor-pointer"
+                                    onClick={() =>
+                                      onOpenPaymentModal(currentClient, false, {
+                                        mode: 'bankLoan',
+                                        targetLoan: loan,
+                                      })
+                                    }
+                                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
                                   >
-                                    Anular
+                                    Abonar
                                   </button>
-                                )}
-                              </div>
+                                  <button
+                                    onClick={() =>
+                                      onOpenPaymentModal(currentClient, true, {
+                                        mode: 'bankLoan',
+                                        targetLoan: loan,
+                                      })
+                                    }
+                                    className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                                    title={`Liquidar préstamo por S/ ${loan.pendingAmount.toFixed(2)}`}
+                                  >
+                                    Liquidar
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-xs italic">Cerrado</span>
+                              )}
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
             ) : (
-              /* Tab 3: Detalle de Abonos */
+              /* Tab 3: Abonos / Pagos */
               <div className="overflow-x-auto border border-slate-200/80 rounded-2xl">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500">
-                        Fecha y Hora
-                      </th>
+                      <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500">Fecha</th>
                       <th className="py-2.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
                         Importe Abonado
                       </th>
@@ -683,7 +681,7 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
                       placeholder="0.00"
                       value={unitPrice}
                       onChange={(e) => setUnitPrice(e.target.value)}
-                      className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
+                      className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 font-mono text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-right"
                     />
                   </div>
                   <div>
@@ -693,37 +691,44 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
                       min="1"
                       required
                       value={quantity}
-                      onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)}
-                      className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
+                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                      className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 font-mono text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-center"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Ticket / Folio (Opcional)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Número de Ticket / Folio</label>
                   <input
                     type="text"
-                    placeholder="Ej. TKT-9912"
+                    placeholder="Ej. TCK-9902 (Opcional)"
                     value={ticketNumber}
                     onChange={(e) => setTicketNumber(e.target.value)}
-                    className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
+                    className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
                   />
                 </div>
 
-                <div className="pt-2 flex justify-end gap-2">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                  <span className="font-bold text-slate-500">Monto Total:</span>
+                  <span className="font-mono font-extrabold text-slate-900 text-sm">
+                    S/ {((parseFloat(String(unitPrice)) || 0) * (quantity || 1)).toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowAddPurchaseModal(false)}
-                    className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                    className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={purchaseLoading}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
                   >
-                    {purchaseLoading ? 'Guardando...' : 'Guardar Compra'}
+                    {purchaseLoading ? 'Registrando...' : 'Registrar Compra'}
                   </button>
                 </div>
               </form>
@@ -731,98 +736,57 @@ export const StatementOfAccountModal: React.FC<StatementOfAccountModalProps> = (
           </div>
         )}
 
-        {/* Annul Payment Reason Modal */}
+        {/* Annul Payment Modal */}
         {annulPaymentId && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xl max-w-sm w-full p-6">
-              <h3 className="text-base font-extrabold text-slate-900 mb-1">Anular Abono</h3>
-              <p className="text-xs text-slate-500 mb-3">
-                Esta acción revertirá el saldo del cliente y quedará registrada en la auditoría del sistema.
-              </p>
-              <textarea
-                rows={3}
-                required
-                placeholder="Motivo de la anulación (obligatorio)..."
-                value={annulReason}
-                onChange={(e) => setAnnulReason(e.target.value)}
-                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 focus:bg-white transition-all mb-4"
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAnnulPaymentId(null)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={!annulReason.trim()}
-                  onClick={handleAnnulPayment}
-                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold cursor-pointer"
-                >
-                  Confirmar Anulación
-                </button>
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xl max-w-md w-full p-6">
+              <div className="flex items-center gap-2.5 text-rose-600 font-bold mb-2">
+                <span className="material-symbols-outlined text-[24px]">warning</span>
+                <h3 className="text-base font-black text-slate-900">Anular Abono Realizado</h3>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Annul Loan Reason Modal */}
-        {annulLoanId && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xl max-w-sm w-full p-6">
-              <h3 className="text-base font-extrabold text-slate-900 mb-1">Anular Crédito con Intereses</h3>
-              <p className="text-xs text-slate-500 mb-3">
-                Esta acción anulará el crédito, cancelará sus cuotas y revertirá el saldo pendiente del cliente.
+              <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+                Al anular este abono, el saldo pendiente del cliente se incrementará nuevamente por el valor del importe
+                original y el registro quedará marcado como <strong>Anulado</strong> para fines de auditoría.
               </p>
-              <textarea
-                rows={3}
-                required
-                placeholder="Motivo de la anulación del crédito (obligatorio)..."
-                value={annulLoanReason}
-                onChange={(e) => setAnnulLoanReason(e.target.value)}
-                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 focus:bg-white transition-all mb-4"
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAnnulLoanId(null)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={!annulLoanReason.trim()}
-                  onClick={handleAnnulLoan}
-                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold cursor-pointer"
-                >
-                  Confirmar Anulación
-                </button>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Motivo de Anulación *</label>
+                  <textarea
+                    rows={2}
+                    required
+                    placeholder="Ej. Error de digitación en caja, ticket duplicado..."
+                    value={annulReason}
+                    onChange={(e) => setAnnulReason(e.target.value)}
+                    className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 focus:bg-white transition-all placeholder:text-slate-400"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAnnulPaymentId(null);
+                      setAnnulReason('');
+                    }}
+                    className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAnnulPayment}
+                    disabled={annulLoading || !annulReason.trim()}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {annulLoading ? 'Anulando...' : 'Confirmar Anulación'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Loan Schedule Details Modal */}
-      {selectedLoanForSchedule && (
-        <LoanScheduleModal
-          isOpen={!!selectedLoanForSchedule}
-          onClose={() => setSelectedLoanForSchedule(null)}
-          clientName={currentClient.name}
-          capital={selectedLoanForSchedule.capital}
-          interestRate={selectedLoanForSchedule.interestRate}
-          interestAmount={selectedLoanForSchedule.interestAmount}
-          totalAmount={selectedLoanForSchedule.totalAmount}
-          installmentsCount={selectedLoanForSchedule.installmentsCount}
-          frequency={selectedLoanForSchedule.frequency}
-          installments={selectedLoanForSchedule.installments}
-          title="Cronograma Detallado del Crédito"
-          code={selectedLoanForSchedule.code}
-        />
-      )}
     </>
   );
 };

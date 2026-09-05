@@ -137,6 +137,8 @@ export const PaymentsHistoryModal: React.FC<PaymentsHistoryModalProps> = ({
           <button
             onClick={onClose}
             className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="Cerrar modal"
+            aria-label="Cerrar modal"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>

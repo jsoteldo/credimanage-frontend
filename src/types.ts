@@ -7,8 +7,11 @@ export interface User {
   role: UserRole;
   avatar?: string;
   active: boolean;
+  approved?: boolean;
   createdAt: string;
 }
+
+export type CurrentView = 'dashboard' | 'clients' | 'debt' | 'bank' | 'reports' | 'admin' | 'settings';
 
 export type ClientStatus = 'Activo' | 'Desactivado';
 export type PaymentPeriod = 'Semanal' | 'Quincenal' | 'Mensual' | 'Día Fijo';
@@ -21,6 +24,12 @@ export interface Client {
   address: string;
   creditLimit: number;
   currentBalance: number; // positive = owes money, 0 = clean, negative = balance in favor
+  dailyDebtBalance?: number; // Deuda corriente pendiente (consumos/compras en tienda)
+  bankDebtBalance?: number; // Saldo pendiente en créditos con intereses (sum(pendingAmount))
+  creditExposure?: number; // Exposición crediticia total: max(0, daily) + bank
+  availableCredit?: number | null; // Crédito disponible contractual o null si sin límite
+  balanceModelVersion?: string;
+  balanceOrigin?: 'MIGRATED_BASELINE' | 'NATIVE_V1' | null;
   paymentPeriod?: PaymentPeriod;
   paymentDay?: string; // e.g. "15" or "Lunes" or "Día 11"
   nextDueDate?: string; // e.g. "2026-08-11" (YYYY-MM-DD)
@@ -93,6 +102,20 @@ export interface CreditPurchase {
   annulmentReason?: string;
 }
 
+export type PaymentTargetType =
+  | 'dailyDebt'
+  | 'bankLoan'
+  | 'legacyDirect'
+  | 'legacyUnknown'
+  | 'legacyMixed';
+
+export interface PaymentAllocation {
+  type: 'bankLoan' | 'dailyDebt';
+  amount: number;
+  loanId?: string;
+  installmentNumber?: number;
+}
+
 export interface Payment {
   id: string;
   clientId: string;
@@ -106,9 +129,51 @@ export interface Payment {
   registeredBy: string;
   status: OperationStatus;
   notes?: string;
+  loanId?: string;
+  targetType?: PaymentTargetType;
+  allocations?: PaymentAllocation[];
   annulledAt?: string;
   annulledBy?: string;
   annulmentReason?: string;
+}
+
+export interface BalanceTransferAllocation {
+  installmentNumber: number;
+  amountApplied: number;
+}
+
+export interface BalanceTransfer {
+  id: string;
+  clientId: string;
+  date: string;
+  amount: number; // Siempre positivo (> 0)
+  sourceBalance: 'dailyDebtBalance';
+  targetLoanId: string;
+  affectedInstallments: BalanceTransferAllocation[];
+  registeredBy: string;
+  reason: string;
+  status: OperationStatus;
+  annulledAt?: string;
+  annulledBy?: string;
+  annulmentReason?: string;
+}
+
+export interface BalanceOpeningSnapshot {
+  id: string;
+  clientId: string;
+  migrationVersion: string;
+  cutOffDate?: string;
+  migrationDate?: string;
+  dailyDebtOpeningBalance: number;
+  bankDebtOpeningBalance: number;
+  currentOpeningBalance: number;
+  creditExposureOpening: number;
+  legacyUnknownPaymentCount: number;
+  legacyMixedPaymentCount?: number;
+  status: 'ACTIVO' | 'CONCILIADO' | 'AJUSTE_CENTAVOS' | 'DISCREPANCIA_CRITICA' | 'ANULADO';
+  reconciliationRef?: string;
+  notes?: string;
+  createdAt: string;
 }
 
 export interface CreditPurchaseWithClient extends CreditPurchase {

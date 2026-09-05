@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Client, DashboardMetrics } from './types';
+import { User, Client, LoanCredit, DashboardMetrics, CurrentView } from './types';
 import { api, getAuthToken, removeAuthToken, setAuthToken } from './services/api';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -17,32 +17,45 @@ import { PaymentsHistoryModal } from './components/PaymentsHistoryModal';
 import { PurchasesHistoryModal } from './components/PurchasesHistoryModal';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
+import { DebtView } from './components/DebtView';
+import { BankView } from './components/BankView';
 
 export default function App() {
+  // Auth State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
   // Navigation State
-  const [currentView, setCurrentView] = useState<
-    'dashboard' | 'clients' | 'reports' | 'admin' | 'settings'
-  >('dashboard');
+  const [currentView, setCurrentView] = useState<CurrentView>('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const [pathname, setPathname] = useState(window.location.pathname);
 
   // listen to navigation changes
   useEffect(() => {
     const handlePopState = () => {
-      setPathname(window.location.pathname);
+      const path = window.location.pathname;
+      setPathname(path);
+      const viewName = path.replace('/', '') || 'dashboard';
+      if (['dashboard', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings'].includes(viewName)) {
+        if (viewName === 'admin' && currentUser && currentUser.role !== 'Administrador') {
+          window.history.replaceState({}, '', '/clients');
+          setPathname('/clients');
+          setCurrentView('clients');
+        } else {
+          setCurrentView(viewName as CurrentView);
+        }
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [currentUser]);
 
   const navigate = (toPath: string) => {
     window.history.pushState({}, '', toPath);
     setPathname(toPath);
   };
-
-  // Auth State
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Data State
   const [clients, setClients] = useState<Client[]>([]);
@@ -69,6 +82,8 @@ export default function App() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
   const [isFullPayoffPayment, setIsFullPayoffPayment] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'dailyDebt' | 'bankLoan'>('dailyDebt');
+  const [targetLoanForPayment, setTargetLoanForPayment] = useState<LoanCredit | null>(null);
 
   const [showAddDebtModal, setShowAddDebtModal] = useState(false);
   const [selectedClientForDebt, setSelectedClientForDebt] = useState<Client | null>(null);
@@ -102,8 +117,14 @@ export default function App() {
           } else {
             // sync view name based on path
             const viewName = window.location.pathname.replace('/', '') || 'dashboard';
-            if (['dashboard', 'clients', 'reports', 'admin', 'settings'].includes(viewName)) {
-              setCurrentView(viewName as any);
+            if (['dashboard', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings'].includes(viewName)) {
+              if (viewName === 'admin' && user.role !== 'Administrador') {
+                window.history.replaceState({}, '', '/clients');
+                setPathname('/clients');
+                setCurrentView('clients');
+              } else {
+                setCurrentView(viewName as CurrentView);
+              }
             }
           }
         } catch (err) {
@@ -123,11 +144,29 @@ export default function App() {
     initAuth();
   }, []);
 
+  // Defense-in-depth: frontend route guard for /admin
+  // Note: This is an additional UX guard and layer of defense-in-depth.
+  // The backend remains the authority for actual operational security and authorization.
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'Administrador') {
+      if (currentView === 'admin' || pathname === '/admin' || window.location.pathname === '/admin') {
+        window.history.replaceState({}, '', '/clients');
+        setPathname('/clients');
+        setCurrentView('clients');
+      }
+    }
+  }, [currentView, pathname, currentUser]);
+
   // Load clients and dashboard metrics
   const loadData = async () => {
     try {
       const clientsData = await api.getClients(searchQuery, 'todos');
       setClients(clientsData);
+
+      // Keep open modal references fresh from backend data
+      setSelectedClientForPayment((prev) => (prev ? clientsData.find((c) => c.id === prev.id) || prev : null));
+      setSelectedClientForStatement((prev) => (prev ? clientsData.find((c) => c.id === prev.id) || prev : null));
+      setSelectedClientForDebt((prev) => (prev ? clientsData.find((c) => c.id === prev.id) || prev : null));
 
       const kpis = await api.getDashboardKPIs();
       setMetrics(kpis);
@@ -203,13 +242,19 @@ export default function App() {
     setShowStatementModal(true);
   };
 
-  const handleOpenPayment = (client: Client, isFullPayoff: boolean = false) => {
+  const handleOpenPayment = (
+    client: Client,
+    isFullPayoff: boolean = false,
+    options?: { mode?: 'dailyDebt' | 'bankLoan'; targetLoan?: LoanCredit | null }
+  ) => {
     setSelectedClientForPayment(client);
     setIsFullPayoffPayment(isFullPayoff);
+    setPaymentMode(options?.mode || (options?.targetLoan ? 'bankLoan' : 'dailyDebt'));
+    setTargetLoanForPayment(options?.targetLoan || null);
     setShowPaymentModal(true);
   };
 
-  const handleOpenAddDebt = (client: Client) => {
+  const handleOpenAddDebt = (client: Client | null) => {
     setSelectedClientForDebt(client);
     setShowAddDebtModal(true);
   };
@@ -234,8 +279,9 @@ export default function App() {
       notes?: string;
     }
   ) => {
+    let freshClient: Client | null = null;
     if (debtData.debtType === 'credit' && debtData.capital && debtData.installmentsCount) {
-      await api.createLoanCredit(clientId, {
+      const res = await api.createLoanCredit(clientId, {
         capital: debtData.capital,
         interestRate: debtData.interestRate || 0,
         interestAmount: debtData.interestAmount || 0,
@@ -249,35 +295,63 @@ export default function App() {
         notes: debtData.notes,
         date: debtData.date,
       });
+      freshClient = res.client;
     } else {
-      await api.addCreditPurchase(clientId, {
+      const res = await api.addCreditPurchase(clientId, {
         product: debtData.product,
         unitPrice: debtData.unitPrice,
         quantity: debtData.quantity || 1,
         ticketNumber: debtData.ticketNumber,
         date: debtData.date,
       });
+      freshClient = res.client;
     }
     await loadData();
-    if (selectedClientForStatement && selectedClientForStatement.id === clientId) {
-      const updated = await api.getClients(selectedClientForStatement.name);
-      if (updated.length > 0) setSelectedClientForStatement(updated[0]);
+    if (freshClient) {
+      if (selectedClientForStatement && selectedClientForStatement.id === clientId) {
+        setSelectedClientForStatement(freshClient);
+      }
+      if (selectedClientForPayment && selectedClientForPayment.id === clientId) {
+        setSelectedClientForPayment(freshClient);
+      }
     }
   };
 
-  const handleConfirmPayment = async (paymentData: {
-    amount: number;
-    paymentMethod: 'Efectivo' | 'Tarjeta' | 'Transferencia';
-    notes?: string;
-    isFullPayoff?: boolean;
-  }) => {
+  const handleConfirmPayment = async (
+    paymentData: {
+      amount: number;
+      paymentMethod: 'Efectivo' | 'Tarjeta' | 'Transferencia';
+      notes?: string;
+      isFullPayoff?: boolean;
+    },
+    context?: {
+      mode: 'dailyDebt' | 'bankLoan';
+      targetLoanId?: string;
+    }
+  ) => {
     if (!selectedClientForPayment) return;
-    await api.registerPayment(selectedClientForPayment.id, paymentData);
+    const mode = context?.mode || paymentMode;
+    let freshClient: Client | null = null;
+
+    if (mode === 'bankLoan') {
+      const loanId = context?.targetLoanId || targetLoanForPayment?.id;
+      if (!loanId) {
+        throw new Error('Debe especificar un préstamo para registrar un abono bancario.');
+      }
+      const res = await api.payLoan(loanId, paymentData);
+      freshClient = res.client;
+    } else {
+      const res = await api.payDailyDebt(selectedClientForPayment.id, paymentData);
+      freshClient = res.client;
+    }
+
     await loadData();
-    // Update active statement client if open
-    if (selectedClientForStatement && selectedClientForStatement.id === selectedClientForPayment.id) {
-      const updated = await api.getClients(selectedClientForPayment.name);
-      if (updated.length > 0) setSelectedClientForStatement(updated[0]);
+
+    if (freshClient) {
+      setSelectedClientForPayment(freshClient);
+      if (selectedClientForStatement && selectedClientForStatement.id === freshClient.id) {
+        setSelectedClientForStatement(freshClient);
+      }
     }
   };
 
@@ -430,7 +504,11 @@ export default function App() {
         setCurrentView={(view) => {
           if (view === 'settings') {
             setShowSettingsModal(true);
+          } else if (view === 'admin' && currentUser?.role !== 'Administrador') {
+            navigate('/clients');
+            setCurrentView('clients');
           } else {
+            navigate(`/${view}`);
             setCurrentView(view);
           }
         }}
@@ -438,10 +516,14 @@ export default function App() {
         onLogout={handleLogout}
         onExportData={handleExportDataCSV}
         onOpenLogin={() => setShowLoginModal(true)}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        isMobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col md:ml-64 min-h-screen pb-16 md:pb-0">
+      <div className={`flex-1 flex flex-col min-w-0 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} min-h-screen pb-16 md:pb-0 transition-all duration-300 ease-in-out`}>
         {/* Top Header Bar */}
         <Header
           searchQuery={searchQuery}
@@ -450,7 +532,12 @@ export default function App() {
           user={currentUser}
           onOpenLogin={() => setShowLoginModal(true)}
           onLogout={handleLogout}
-          onNavigateToAdminSecret={() => setCurrentView('admin')}
+          onNavigateToAdminSecret={() => {
+            if (currentUser?.role === 'Administrador') {
+              navigate('/admin');
+              setCurrentView('admin');
+            }
+          }}
           onFilterClientsWithDebt={() => {
             setStatusFilter('con_deuda');
             setCurrentView('clients');
@@ -460,11 +547,11 @@ export default function App() {
           todayPaymentsTotal={metrics.todayPaymentsTotal}
           clientsAtLimitCount={metrics.clientsAtLimitCount}
           clientsAtLimitNames={metrics.clientsAtLimitNames}
+          onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
 
         {/* Main View Router */}
         <main className="flex-1 p-margin-mobile md:p-margin-desktop max-w-[1440px] mx-auto w-full">
-          {/* VIEW 1: Dashboard or Clients */}
           {/* VIEW 1: Dashboard */}
           {currentView === 'dashboard' && (
             <>
@@ -497,6 +584,7 @@ export default function App() {
           {currentView === 'clients' && (
             <ClientsTable
               clients={clients}
+              onNewClient={handleOpenNewClient}
               onViewStatement={handleOpenStatement}
               onEditClient={handleOpenEditClient}
               onPayClient={(c) => handleOpenPayment(c, false)}
@@ -512,6 +600,28 @@ export default function App() {
             />
           )}
 
+          {/* VIEW: Deuda (Consumos y compras) */}
+          {currentView === 'debt' && (
+            <DebtView
+              clients={clients}
+              currentUser={currentUser}
+              onViewStatement={handleOpenStatement}
+              onPayClient={(c) => handleOpenPayment(c, false)}
+              onAddDebtClient={handleOpenAddDebt}
+              onRefreshData={loadData}
+            />
+          )}
+
+          {/* VIEW: Banco (Créditos con intereses) */}
+          {currentView === 'bank' && (
+            <BankView
+              clients={clients}
+              currentUser={currentUser}
+              onPayClient={(c, options) => handleOpenPayment(c, false, options)}
+              onRefreshData={loadData}
+            />
+          )}
+
           {/* VIEW 2: Reporte de Saldos */}
           {currentView === 'reports' && (
             <BalanceReportView
@@ -521,12 +631,18 @@ export default function App() {
             />
           )}
 
-          {/* VIEW 3: Protected Admin Panel */}
-          {currentView === 'admin' && (
+          {/* VIEW 3: Protected Admin Panel (Admin-only role guard) */}
+          {currentView === 'admin' && currentUser.role === 'Administrador' && (
             <AdminPanel
               currentUser={currentUser}
-              onNavigateToClients={() => setCurrentView('clients')}
-              onNavigateToReports={() => setCurrentView('reports')}
+              onNavigateToClients={() => {
+                navigate('/clients');
+                setCurrentView('clients');
+              }}
+              onNavigateToReports={() => {
+                navigate('/reports');
+                setCurrentView('reports');
+              }}
               onViewStatement={handleOpenStatement}
             />
           )}
@@ -556,6 +672,26 @@ export default function App() {
         </button>
 
         <button
+          onClick={() => setCurrentView('debt')}
+          className={`flex flex-col items-center p-1 cursor-pointer ${
+            currentView === 'debt' ? 'text-indigo-600 font-bold' : 'text-slate-500'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
+          <span className="text-[10px] font-semibold mt-0.5">Deuda</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentView('bank')}
+          className={`flex flex-col items-center p-1 cursor-pointer ${
+            currentView === 'bank' ? 'text-indigo-600 font-bold' : 'text-slate-500'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[20px]">account_balance</span>
+          <span className="text-[10px] font-semibold mt-0.5">Banco</span>
+        </button>
+
+        <button
           onClick={() => setCurrentView('reports')}
           className={`flex flex-col items-center p-1 cursor-pointer ${
             currentView === 'reports' ? 'text-indigo-600 font-bold' : 'text-slate-500'
@@ -564,8 +700,6 @@ export default function App() {
           <span className="material-symbols-outlined text-[20px]">analytics</span>
           <span className="text-[10px] font-semibold mt-0.5">Reportes</span>
         </button>
-
-
       </nav>
 
       {/* --- MODALS --- */}
@@ -576,6 +710,8 @@ export default function App() {
         onClose={() => setShowClientFormModal(false)}
         onSubmit={handleSaveClient}
         initialClient={selectedClientForEdit}
+        onDeactivateClient={handleDeactivateClient}
+        onReactivateClient={handleReactivateClient}
       />
 
       {/* Statement of Account Modal */}
@@ -584,8 +720,8 @@ export default function App() {
         onClose={() => setShowStatementModal(false)}
         client={selectedClientForStatement}
         currentUser={currentUser}
-        onOpenPaymentModal={(client, isFullPayoff) => {
-          handleOpenPayment(client, isFullPayoff);
+        onOpenPaymentModal={(client, isFullPayoff, options) => {
+          handleOpenPayment(client, isFullPayoff, options);
         }}
         onOpenAddDebtModal={handleOpenAddDebt}
         onRefreshData={loadData}
@@ -594,8 +730,13 @@ export default function App() {
       {/* Payment / Abono Modal */}
       <PaymentModal
         isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setTargetLoanForPayment(null);
+        }}
         client={selectedClientForPayment}
+        mode={paymentMode}
+        targetLoan={targetLoanForPayment}
         onConfirmPayment={handleConfirmPayment}
         isFullPayoffDefault={isFullPayoffPayment}
       />
@@ -605,7 +746,9 @@ export default function App() {
         isOpen={showAddDebtModal}
         onClose={() => setShowAddDebtModal(false)}
         client={selectedClientForDebt}
+        clients={clients}
         onSubmit={handleConfirmAddDebt}
+        onClientCreated={() => loadData()}
       />
 
       {/* Payment Reminders / Cobranzas Modal */}

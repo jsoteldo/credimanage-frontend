@@ -70,7 +70,7 @@ export const BalanceReportView: React.FC<BalanceReportViewProps> = ({
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-[1440px] mx-auto w-full flex flex-col gap-6">
+    <div className="space-y-6 w-full">
       {/* Header & KPIs */}
       <div className="flex flex-col lg:flex-row gap-6 justify-between items-start lg:items-end">
         <div>
@@ -165,7 +165,7 @@ export const BalanceReportView: React.FC<BalanceReportViewProps> = ({
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">NOMBRE DEL CLIENTE</th>
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">TELÉFONO</th>
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">LÍMITE CRÉDITO</th>
-                <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">SALDO PENDIENTE</th>
+                <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">SALDO TOTAL CONSOLIDADO</th>
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">CRÉDITO DISP.</th>
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">ESTADO</th>
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">ACCIONES</th>
@@ -193,7 +193,12 @@ export const BalanceReportView: React.FC<BalanceReportViewProps> = ({
                     client.currentBalance > 0;
                   const hasDebt = client.currentBalance > 0;
                   const hasFavor = client.currentBalance < 0;
-                  const availableCredit = client.creditLimit > 0 ? Math.max(0, client.creditLimit - client.currentBalance) : 'Sin límite';
+                  const availableCredit =
+                    client.availableCredit != null
+                      ? client.availableCredit
+                      : client.creditLimit > 0
+                      ? Math.max(0, client.creditLimit - client.currentBalance)
+                      : 'Sin límite';
 
                   return (
                     <tr key={client.id} className="hover:bg-slate-50/80 transition-colors group">

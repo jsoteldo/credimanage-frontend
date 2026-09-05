@@ -1,16 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Client } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Client, LoanCredit } from '../types';
+
+export interface PaymentContext {
+  mode: 'dailyDebt' | 'bankLoan';
+  targetLoanId?: string;
+}
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   client: Client | null;
-  onConfirmPayment: (paymentData: {
-    amount: number;
-    paymentMethod: 'Efectivo' | 'Tarjeta' | 'Transferencia';
-    notes?: string;
-    isFullPayoff?: boolean;
-  }) => Promise<void>;
+  mode?: 'dailyDebt' | 'bankLoan';
+  targetLoan?: LoanCredit | null;
+  onConfirmPayment: (
+    paymentData: {
+      amount: number;
+      paymentMethod: 'Efectivo' | 'Tarjeta' | 'Transferencia';
+      notes?: string;
+      isFullPayoff?: boolean;
+    },
+    context?: PaymentContext
+  ) => Promise<void>;
   isFullPayoffDefault?: boolean;
 }
 
@@ -18,6 +28,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   onClose,
   client,
+  mode = 'dailyDebt',
+  targetLoan = null,
   onConfirmPayment,
   isFullPayoffDefault = false,
 }) => {
@@ -29,11 +41,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isSubmittingRef = useRef(false);
+
+  const isBank = mode === 'bankLoan' && Boolean(targetLoan);
+
   useEffect(() => {
     if (client) {
+      const debtToPay = isBank
+        ? (targetLoan?.pendingAmount ?? 0)
+        : Math.max(0, client.dailyDebtBalance ?? 0);
+
       if (isFullPayoffDefault) {
         setIsFullPayoff(true);
-        setAmountInput(String(Math.max(0, client.currentBalance)));
+        setAmountInput(String(debtToPay));
       } else {
         setIsFullPayoff(false);
         setAmountInput('');
@@ -43,13 +63,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setStep('input');
       setError(null);
     }
-  }, [client, isOpen, isFullPayoffDefault]);
+  }, [client, isOpen, isFullPayoffDefault, mode, targetLoan]);
 
   if (!isOpen || !client) return null;
 
-  const currentBalance = client.currentBalance;
-  const payAmount = isFullPayoff ? currentBalance : parseFloat(amountInput) || 0;
-  const resultingBalance = currentBalance - payAmount;
+  const targetDebt = isBank
+    ? (targetLoan?.pendingAmount ?? 0)
+    : (client.dailyDebtBalance ?? 0);
+
+  const payAmount = isFullPayoff
+    ? (isBank ? targetDebt : Math.max(0, targetDebt))
+    : parseFloat(amountInput) || 0;
+
+  const resultingBalance = Math.round((targetDebt - payAmount) * 100) / 100;
   const cardSurcharge = paymentMethod === 'Tarjeta' ? Math.round(payAmount * 0.05 * 100) / 100 : 0;
   const totalCharged = payAmount + cardSurcharge;
 
@@ -67,26 +93,43 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       return;
     }
 
+    // Overpayment validation for bank loans
+    if (isBank && payAmount > targetDebt) {
+      setError(
+        `El importe a abonar (S/ ${payAmount.toFixed(2)}) no puede superar el saldo pendiente del préstamo (S/ ${targetDebt.toFixed(2)}).`
+      );
+      return;
+    }
+
     // Advance to confirmation step
     setStep('confirm');
   };
 
   const handleFinalSubmit = async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setLoading(true);
     setError(null);
 
     try {
-      await onConfirmPayment({
-        amount: payAmount,
-        paymentMethod,
-        notes,
-        isFullPayoff,
-      });
+      await onConfirmPayment(
+        {
+          amount: payAmount,
+          paymentMethod,
+          notes,
+          isFullPayoff,
+        },
+        {
+          mode: isBank ? 'bankLoan' : 'dailyDebt',
+          targetLoanId: targetLoan?.id,
+        }
+      );
       onClose();
     } catch (err: any) {
       setError(err.message || 'Error al procesar el abono');
       setStep('input');
     } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   };
@@ -98,15 +141,26 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <div>
             <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
-              {isFullPayoff ? 'Liquidar Adeudo Total' : 'Registrar Abono a Cuenta'}
+              {isBank
+                ? isFullPayoff
+                  ? 'Liquidar Préstamo Bancario'
+                  : 'Abonar a Préstamo Bancario'
+                : isFullPayoff
+                ? 'Liquidar Deuda Corriente'
+                : 'Registrar Abono a Deuda Corriente'}
             </h3>
             <p className="text-xs font-medium text-slate-500 mt-0.5">
               Cliente: <strong className="text-slate-900 font-semibold">{client.name}</strong> ({client.clientNumber})
+              {isBank && targetLoan && (
+                <> • Préstamo: <strong className="font-mono text-indigo-700">{targetLoan.code}</strong></>
+              )}
             </p>
           </div>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 cursor-pointer p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+            title="Cerrar modal"
+            aria-label="Cerrar modal"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
@@ -124,18 +178,53 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <form onSubmit={handleNextStep} className="p-6 space-y-4">
             {/* Balance Summary Box */}
             <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-1.5">
-              <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
-                <span>Saldo Actual Pendiente:</span>
-                <span className={`font-mono font-extrabold text-sm ${currentBalance > 0 ? 'text-rose-600' : 'text-indigo-600'}`}>
-                  S/ {currentBalance.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
-                <span>Límite de Crédito:</span>
-                <span className="font-mono text-slate-800 font-semibold">
-                  {client.creditLimit > 0 ? `S/ ${client.creditLimit.toLocaleString('es-PE', { minimumFractionDigits: 2 })}` : 'Sin límite'}
-                </span>
-              </div>
+              {isBank && targetLoan ? (
+                <>
+                  <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Préstamo a Abonar:</span>
+                    <span className="font-mono font-bold text-slate-900">{targetLoan.code}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Saldo Pendiente del Préstamo:</span>
+                    <span className="font-mono font-extrabold text-sm text-rose-600">
+                      S/ {targetDebt.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-slate-400 font-medium pt-1 border-t border-slate-200/60">
+                    <span>Deuda Bancaria Total (Agregada):</span>
+                    <span className="font-mono font-semibold text-slate-600">
+                      S/ {(client.bankDebtBalance ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Deuda Corriente Pendiente:</span>
+                    <span
+                      className={`font-mono font-extrabold text-sm ${
+                        targetDebt > 0 ? 'text-rose-600' : 'text-indigo-600'
+                      }`}
+                    >
+                      S/ {targetDebt.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Límite de Crédito:</span>
+                    <span className="font-mono text-slate-800 font-semibold">
+                      {client.creditLimit > 0
+                        ? `S/ ${client.creditLimit.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`
+                        : 'Sin límite'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-slate-400 font-medium pt-1 border-t border-slate-200/60">
+                    <span>Saldo Consolidado Total:</span>
+                    <span className="font-mono font-semibold text-slate-600">
+                      S/ {client.currentBalance.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Quick Action: Liquidar Adeudo */}
@@ -148,13 +237,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   const checked = e.target.checked;
                   setIsFullPayoff(checked);
                   if (checked) {
-                    setAmountInput(String(Math.max(0, currentBalance)));
+                    const fullAmount = isBank ? targetDebt : Math.max(0, targetDebt);
+                    setAmountInput(String(fullAmount));
                   }
                 }}
                 className="w-4 h-4 text-indigo-600 rounded-md focus:ring-indigo-500 cursor-pointer"
               />
               <label htmlFor="checkbox-liquidar" className="text-xs font-bold text-slate-800 cursor-pointer">
-                Liquidar adeudo completo (S/ {Math.max(0, currentBalance).toFixed(2)} Soles Peruanos)
+                {isBank
+                  ? `Liquidar préstamo completo (S/ ${targetDebt.toFixed(2)} Soles Peruanos)`
+                  : `Liquidar adeudo corriente completo (S/ ${Math.max(0, targetDebt).toFixed(2)} Soles Peruanos)`}
               </label>
             </div>
 
@@ -172,7 +264,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   step="0.01"
                   min="0.01"
                   disabled={isFullPayoff}
-                  value={isFullPayoff ? Math.max(0, currentBalance) : amountInput}
+                  value={isFullPayoff ? (isBank ? targetDebt : Math.max(0, targetDebt)) : amountInput}
                   onChange={(e) => setAmountInput(e.target.value)}
                   placeholder="0.00"
                   className="w-full h-12 pl-11 pr-3.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-mono text-xl font-extrabold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-right"
@@ -183,8 +275,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {/* Resulting Balance Calculation Preview */}
             <div className="p-3 bg-white rounded-xl border border-slate-200 flex justify-between items-center shadow-2xs">
-              <span className="text-xs font-medium text-slate-500">Nuevo Saldo Resultante:</span>
-              <span className={`font-mono font-extrabold text-base ${resultingBalance > 0 ? 'text-rose-600' : 'text-indigo-600'}`}>
+              <span className="text-xs font-medium text-slate-500">
+                {isBank ? 'Saldo Pendiente Resultante del Préstamo:' : 'Nuevo Saldo Corriente Resultante:'}
+              </span>
+              <span
+                className={`font-mono font-extrabold text-base ${
+                  resultingBalance > 0 ? 'text-rose-600' : 'text-indigo-600'
+                }`}
+              >
                 S/ {resultingBalance.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -247,26 +345,26 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
 
             {/* Footer buttons */}
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
+            <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row justify-end gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer text-center"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                Continuar a Confirmación
+                <span>Continuar a Confirmación</span>
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
             </div>
           </form>
         )}
 
-        {/* STEP 2: Pre-Confirmation Screen as per requirement */}
+        {/* STEP 2: Pre-Confirmation Screen */}
         {step === 'confirm' && (
           <div className="p-6 space-y-4">
             <div className="p-4 bg-amber-50 text-amber-900 border border-amber-200/80 rounded-2xl space-y-1">
@@ -275,7 +373,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 Confirmación de Movimiento Financiero
               </div>
               <p className="text-xs text-amber-800">
-                Por favor revise cuidadosamente los valores antes de aplicar la transacción a la cartera del cliente:
+                Por favor revise cuidadosamente los valores antes de aplicar la transacción:
               </p>
             </div>
 
@@ -285,14 +383,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <span className="text-slate-500 font-medium">Cliente:</span>
                 <span className="font-bold text-slate-900">{client.name}</span>
               </div>
-              <div className="p-3 flex justify-between">
-                <span className="text-slate-500 font-medium">Saldo Actual:</span>
-                <span className="font-mono font-bold text-rose-600">
-                  S/ {currentBalance.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+              {isBank && targetLoan ? (
+                <>
+                  <div className="p-3 flex justify-between">
+                    <span className="text-slate-500 font-medium">Préstamo:</span>
+                    <span className="font-mono font-bold text-indigo-700">{targetLoan.code}</span>
+                  </div>
+                  <div className="p-3 flex justify-between">
+                    <span className="text-slate-500 font-medium">Saldo Pendiente del Préstamo:</span>
+                    <span className="font-mono font-bold text-rose-600">
+                      S/ {targetDebt.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="p-3 flex justify-between">
+                  <span className="text-slate-500 font-medium">Deuda Corriente Actual:</span>
+                  <span className="font-mono font-bold text-rose-600">
+                    S/ {targetDebt.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
               <div className="p-3 flex justify-between bg-emerald-50/60">
-                <span className="text-emerald-900 font-bold">Importe del Abono (a Deuda):</span>
+                <span className="text-emerald-900 font-bold">Importe del Abono:</span>
                 <span className="font-mono font-black text-emerald-700 text-sm">
                   -S/ {payAmount.toLocaleString('es-PE', { minimumFractionDigits: 2 })} PEN
                 </span>
@@ -317,8 +430,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </>
               )}
               <div className="p-3 flex justify-between">
-                <span className="text-slate-500 font-medium">Nuevo Saldo Resultante:</span>
-                <span className={`font-mono font-black text-sm ${resultingBalance > 0 ? 'text-rose-600' : 'text-indigo-600'}`}>
+                <span className="text-slate-500 font-medium">
+                  {isBank ? 'Nuevo Saldo del Préstamo:' : 'Nuevo Saldo Corriente Resultante:'}
+                </span>
+                <span
+                  className={`font-mono font-black text-sm ${
+                    resultingBalance > 0 ? 'text-rose-600' : 'text-indigo-600'
+                  }`}
+                >
                   S/ {resultingBalance.toLocaleString('es-PE', { minimumFractionDigits: 2 })} PEN
                 </span>
               </div>
@@ -328,20 +447,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             </div>
 
-            {resultingBalance < 0 && (
+            {!isBank && resultingBalance < 0 && (
               <div className="p-3 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-xl text-xs flex items-center gap-2 font-medium">
                 <span className="material-symbols-outlined text-[18px]">info</span>
-                <span>Este abono genera un <strong>saldo a favor de S/ {Math.abs(resultingBalance).toFixed(2)}</strong> para el cliente.</span>
+                <span>
+                  Este abono genera un <strong>saldo a favor de S/ {Math.abs(resultingBalance).toFixed(2)}</strong> para el cliente en su cuenta corriente.
+                </span>
               </div>
             )}
 
             {/* Confirmation Actions */}
-            <div className="pt-4 border-t border-slate-100 flex justify-between gap-3">
+            <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setStep('input')}
                 disabled={loading}
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer text-center"
               >
                 Volver a Editar
               </button>
@@ -349,10 +470,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 type="button"
                 onClick={handleFinalSubmit}
                 disabled={loading}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                {loading ? 'Procesando...' : 'Confirmar y Registrar Movimiento'}
+                <span>{loading ? 'Procesando...' : 'Confirmar y Registrar Movimiento'}</span>
               </button>
             </div>
           </div>

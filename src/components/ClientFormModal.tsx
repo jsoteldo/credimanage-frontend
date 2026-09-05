@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Client, PaymentPeriod, PaymentFrequency } from '../types';
 import {
   calculateLoanSchedule,
@@ -28,6 +28,9 @@ interface ClientFormModalProps {
   onClose: () => void;
   onSubmit: (clientData: Partial<Client>, initialCredit?: InitialCreditPayload) => Promise<void>;
   initialClient?: Client | null;
+  onDeactivateClient?: (client: Client) => void;
+  onReactivateClient?: (client: Client) => void;
+  zIndexClass?: string;
 }
 
 export const ClientFormModal: React.FC<ClientFormModalProps> = ({
@@ -35,6 +38,9 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   onClose,
   onSubmit,
   initialClient,
+  onDeactivateClient,
+  onReactivateClient,
+  zIndexClass,
 }) => {
   // Client base info
   const [name, setName] = useState('');
@@ -47,6 +53,9 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [nextDueDate, setNextDueDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Synchronous submission mutex
+  const isSubmittingRef = useRef(false);
 
   // Initial Credit Mode
   const [initialDebtType, setInitialDebtType] = useState<'none' | 'simple' | 'credit'>('none');
@@ -134,6 +143,13 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
+
+    if (parsedCreditLimit < 0) {
+      setError('El límite de crédito no puede ser negativo');
+      return;
+    }
+
     if (!name.trim()) {
       setError('El Nombre Completo es obligatorio');
       return;
@@ -167,6 +183,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
       }
     }
 
+    isSubmittingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -202,13 +219,14 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     } catch (err: any) {
       setError(err.message || 'Error al guardar cliente');
     } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   };
 
   return (
     <>
-      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className={`fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center ${zIndexClass || 'z-50'} p-4 overflow-y-auto`}>
         <div className="w-full max-w-2xl bg-white rounded-3xl border border-slate-200/80 shadow-2xl my-4 max-h-[92vh] flex flex-col overflow-hidden">
           {/* Modal Header */}
           <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center shrink-0">
@@ -225,6 +243,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-slate-600 cursor-pointer p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+              title="Cerrar modal"
+              aria-label="Cerrar modal"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
@@ -637,23 +657,63 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
             )}
 
             {/* Modal Actions */}
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={loading}
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">save</span>
-                {loading ? 'Guardando...' : 'Guardar Cliente'}
-              </button>
+            <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              {/* Left Action: Desactivar / Reactivar Cliente (Req 2.3) */}
+              <div>
+                {initialClient && (
+                  initialClient.status === 'Activo' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onDeactivateClient) {
+                          onDeactivateClient(initialClient);
+                          onClose();
+                        }
+                      }}
+                      className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      title="Desactivar este cliente conservando su historial"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">block</span>
+                      <span>Desactivar Cliente</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onReactivateClient) {
+                          onReactivateClient(initialClient);
+                          onClose();
+                        }
+                      }}
+                      className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      title="Reactivar cliente para operaciones"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                      <span>Reactivar Cliente</span>
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* Right Actions: Cancelar and Guardar Cliente */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">save</span>
+                  {loading ? 'Guardando...' : 'Guardar Cliente'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -673,6 +733,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           frequency={loanCalculation.frequency}
           installments={loanCalculation.installments}
           title="Cronograma Proyectado de Cuotas"
+          zIndexClass="z-[70]"
         />
       )}
     </>

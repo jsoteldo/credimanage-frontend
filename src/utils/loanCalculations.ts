@@ -35,7 +35,38 @@ export function calculateDueDate(firstDueDateStr: string, index: number, frequen
   if (frequency === 'Semanal') {
     date.setDate(date.getDate() + 7 * index);
   } else if (frequency === 'Quincenal') {
-    date.setDate(date.getDate() + 15 * index);
+    const lastDayOfInitialMonth = new Date(year, month + 1, 0).getDate();
+    const isCommercialAnchor = day === 15 || day === lastDayOfInitialMonth;
+
+    if (isCommercialAnchor) {
+      let curYear = year;
+      let curMonth = month;
+      let curDay = day;
+
+      for (let step = 0; step < index; step++) {
+        const lastDayOfCurMonth = new Date(curYear, curMonth + 1, 0).getDate();
+        if (curDay === 15) {
+          // If on day 15, next is the last day of the same month
+          curDay = lastDayOfCurMonth;
+        } else {
+          // If on the last day of the month, next is day 15 of the following month
+          curMonth++;
+          if (curMonth > 11) {
+            curYear++;
+            curMonth = 0;
+          }
+          curDay = 15;
+        }
+      }
+
+      const y = curYear;
+      const m = String(curMonth + 1).padStart(2, '0');
+      const d = String(curDay).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    } else {
+      // Non-anchor starting date: maintain explicit fallback (+15 days per index) without inventing behavior
+      date.setDate(date.getDate() + 15 * index);
+    }
   } else if (frequency === 'Mensual') {
     // Add months preserving the day where possible
     const targetMonth = month + index;

@@ -15,6 +15,7 @@ interface LoanScheduleModalProps {
   installments: LoanInstallment[];
   title?: string;
   code?: string;
+  zIndexClass?: string;
 }
 
 export const LoanScheduleModal: React.FC<LoanScheduleModalProps> = ({
@@ -30,6 +31,7 @@ export const LoanScheduleModal: React.FC<LoanScheduleModalProps> = ({
   installments,
   title = 'Cronograma de Pagos',
   code,
+  zIndexClass,
 }) => {
   if (!isOpen) return null;
 
@@ -74,7 +76,7 @@ export const LoanScheduleModal: React.FC<LoanScheduleModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-60 p-4 overflow-y-auto">
+    <div className={`fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center ${zIndexClass || 'z-[70]'} p-4 overflow-y-auto`}>
       <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-3xl my-6 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="bg-indigo-600 text-white p-5 md:p-6 flex items-center justify-between relative shadow-md">
@@ -100,6 +102,8 @@ export const LoanScheduleModal: React.FC<LoanScheduleModalProps> = ({
           <button
             onClick={onClose}
             className="w-9 h-9 rounded-full bg-indigo-700/80 hover:bg-indigo-800 text-indigo-100 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="Cerrar cronograma"
+            aria-label="Cerrar cronograma"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
@@ -177,13 +181,13 @@ export const LoanScheduleModal: React.FC<LoanScheduleModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
           <span className="text-xs text-slate-500 font-medium">
             Interés simple sobre capital inicial ({interestRate}%) distribuido en {installmentsCount} cuotas.
           </span>
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+            className="px-5 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer text-center"
           >
             Cerrar Cronograma
           </button>

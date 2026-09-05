@@ -88,6 +88,8 @@ export const PaymentRemindersModal: React.FC<PaymentRemindersModalProps> = ({
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Cerrar modal"
+            aria-label="Cerrar modal"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>

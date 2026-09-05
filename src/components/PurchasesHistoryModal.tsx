@@ -110,6 +110,8 @@ export const PurchasesHistoryModal: React.FC<PurchasesHistoryModalProps> = ({
           <button
             onClick={onClose}
             className="w-9 h-9 rounded-full bg-indigo-700/80 hover:bg-indigo-800 text-indigo-100 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="Cerrar modal"
+            aria-label="Cerrar modal"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>

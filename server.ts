@@ -90,16 +90,38 @@ async function startServer() {
     }
 
     // Demo password checks: admin123 or cajero123 or any 6+ char password for existing users
-    const user = usersStore.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+    let user = usersStore.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
     if (!user) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
-
-    if (email === 'admin@credimanage.pos' && password !== 'admin123') {
-      return res.status(401).json({ error: 'Contraseña incorrecta para Administrador' });
-    }
-    if (email === 'cajero@credimanage.pos' && password !== 'cajero123') {
-      return res.status(401).json({ error: 'Contraseña incorrecta para Cajero' });
+      if (email.trim().toLowerCase() === 'admin@credimanage.pos' && password === 'admin123') {
+        user = {
+          id: 'usr-admin-default',
+          name: 'Administrador POS',
+          email: 'admin@credimanage.pos',
+          role: 'Administrador',
+          active: true,
+          createdAt: new Date().toISOString(),
+        };
+        usersStore.push(user);
+      } else if (email.trim().toLowerCase() === 'cajero@credimanage.pos' && password === 'cajero123') {
+        user = {
+          id: 'usr-cajero-default',
+          name: 'Cajero Principal',
+          email: 'cajero@credimanage.pos',
+          role: 'Cajero',
+          active: true,
+          createdAt: new Date().toISOString(),
+        };
+        usersStore.push(user);
+      } else {
+        return res.status(401).json({ error: 'Credenciales inválidas' });
+      }
+    } else {
+      if (email === 'admin@credimanage.pos' && password !== 'admin123') {
+        return res.status(401).json({ error: 'Contraseña incorrecta para Administrador' });
+      }
+      if (email === 'cajero@credimanage.pos' && password !== 'cajero123') {
+        return res.status(401).json({ error: 'Contraseña incorrecta para Cajero' });
+      }
     }
 
     const token = jwt.sign(
@@ -558,6 +580,19 @@ async function startServer() {
     res.json(clientLoans);
   });
 
+  // Get All Loans (with client info for Banco view)
+  app.get('/api/loans', authenticateJWT, (req: Request, res: Response) => {
+    const enrichedLoans = loansStore.map((l) => {
+      const client = clientsStore.find((c) => c.id === l.clientId);
+      return {
+        ...l,
+        clientName: l.clientName || client?.name || 'Cliente',
+        clientNumber: l.clientNumber || client?.clientNumber || '',
+      };
+    });
+    res.json(enrichedLoans);
+  });
+
   // Get Single Loan
   app.get('/api/loans/:id', authenticateJWT, (req: Request, res: Response) => {
     const { id } = req.params;
@@ -702,6 +737,53 @@ async function startServer() {
     );
 
     res.status(201).json({ purchase: newPurchase, client });
+  });
+
+  // Annul Credit Purchase / Charge (Admin only)
+  app.post('/api/purchases/:id/annul', authenticateJWT, requireAdminRole, (req: AuthenticatedRequest, res: Response) => {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'Debe especificar el motivo de la anulación del cargo o compra' });
+    }
+
+    const purchase = purchasesStore.find((p) => p.id === id);
+    if (!purchase) {
+      return res.status(404).json({ error: 'Compra o cargo no encontrado' });
+    }
+
+    if (purchase.status === 'Anulado') {
+      return res.status(400).json({ error: 'Esta compra ya se encuentra anulada' });
+    }
+
+    if (purchase.debtType === 'credit' || purchase.loanId) {
+      return res.status(400).json({
+        error: 'Esta compra pertenece a un crédito con cuotas e intereses. Debe gestionarse desde la sección de Banco.',
+      });
+    }
+
+    const client = clientsStore.find((c) => c.id === purchase.clientId);
+    if (!client) {
+      return res.status(404).json({ error: 'Cliente asociado no encontrado' });
+    }
+
+    purchase.status = 'Anulado';
+    purchase.annulledAt = new Date().toISOString();
+    purchase.annulledBy = req.user!.name;
+    purchase.annulmentReason = reason.trim();
+
+    client.currentBalance = Math.round((client.currentBalance - purchase.amount) * 100) / 100;
+    client.updatedAt = new Date().toISOString();
+
+    logAudit(
+      req.user!,
+      'ANULACION_COMPRA_CREDITO',
+      `Compra/cargo (${purchase.product} - Folio ${purchase.ticketNumber || 'N/A'}) de S/ ${purchase.amount.toFixed(2)} anulado para ${client.name}. Motivo: ${reason.trim()}. Saldo resultante: S/ ${client.currentBalance.toFixed(2)}`,
+      purchase.id
+    );
+
+    res.json({ message: 'Compra/cargo anulado con éxito', purchase, client });
   });
 
   // Register Abono (Partial or Full Payment)

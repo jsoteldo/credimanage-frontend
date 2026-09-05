@@ -130,7 +130,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-[1440px] mx-auto w-full space-y-6">
+    <div className="space-y-6 w-full">
       {/* Header */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>

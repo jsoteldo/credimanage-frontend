@@ -132,6 +132,8 @@ export const api = {
 
   getClientLoans: (clientId: string) => request<LoanCredit[]>(`/api/clients/${clientId}/loans`),
 
+  getAllLoans: () => request<LoanCredit[]>('/api/loans'),
+
   getLoanById: (loanId: string) => request<LoanCredit>(`/api/loans/${loanId}`),
 
   annulLoan: (loanId: string, reason: string) =>
@@ -150,7 +152,42 @@ export const api = {
       body: JSON.stringify(purchase),
     }),
 
-  // Payment / Abono
+  annulCreditPurchase: (purchaseId: string, reason: string) =>
+    request<{ message: string; purchase: CreditPurchase; client: Client }>(`/api/purchases/${purchaseId}/annul`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  // Payment / Abono - Flujos Específicos
+  payDailyDebt: (
+    clientId: string,
+    payment: {
+      amount: number;
+      paymentMethod: 'Efectivo' | 'Tarjeta' | 'Transferencia';
+      notes?: string;
+      isFullPayoff?: boolean;
+    }
+  ) =>
+    request<{ payment: Payment; client: Client; message: string }>(`/api/clients/${clientId}/debt-payment`, {
+      method: 'POST',
+      body: JSON.stringify(payment),
+    }),
+
+  payLoan: (
+    loanId: string,
+    payment: {
+      amount: number;
+      paymentMethod: 'Efectivo' | 'Tarjeta' | 'Transferencia';
+      notes?: string;
+      isFullPayoff?: boolean;
+    }
+  ) =>
+    request<{ payment: Payment; client: Client; message: string }>(`/api/loans/${loanId}/payment`, {
+      method: 'POST',
+      body: JSON.stringify(payment),
+    }),
+
+  // Legacy Generic Payment (conservado exclusivamente para retrocompatibilidad, no invocar desde UI moderna)
   registerPayment: (
     clientId: string,
     payment: {

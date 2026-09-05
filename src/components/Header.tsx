@@ -4,7 +4,7 @@ import { User } from '../types';
 interface HeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  onNewClient: () => void;
+  onNewClient?: () => void;
   user: User | null;
   onOpenLogin: () => void;
   onLogout: () => void;
@@ -15,6 +15,7 @@ interface HeaderProps {
   todayPaymentsTotal?: number;
   clientsAtLimitCount?: number;
   clientsAtLimitNames?: string[];
+  onOpenMobileSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -31,6 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   todayPaymentsTotal = 0,
   clientsAtLimitCount = 0,
   clientsAtLimitNames = [],
+  onOpenMobileSidebar,
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -65,11 +67,23 @@ export const Header: React.FC<HeaderProps> = ({
     <>
       <header className="flex justify-between items-center px-4 md:px-8 py-3 w-full sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 h-16 shadow-2xs">
         <div className="flex items-center gap-3">
+          {/* Mobile Drawer Trigger (Hamburger) */}
+          {onOpenMobileSidebar && (
+            <button
+              onClick={onOpenMobileSidebar}
+              className="md:hidden p-1.5 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+              title="Abrir menú lateral"
+              aria-label="Abrir menú lateral"
+            >
+              <span className="material-symbols-outlined text-[24px]">menu</span>
+            </button>
+          )}
+
           <div className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow-xs">
+            <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow-xs shrink-0">
               POS
             </span>
-            <span>CrediManage</span>
+            <span className="truncate">CrediManage</span>
           </div>
         </div>
 
@@ -80,6 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => setShowNotifications(!showNotifications)}
               className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors cursor-pointer relative"
               title="Notificaciones"
+              aria-label="Notificaciones del sistema"
             >
               <span className="material-symbols-outlined text-[20px]">notifications</span>
               {user && (clientsAtLimitCount > 0 || todayPaymentsCount > 0) && (
@@ -91,18 +106,11 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => setShowHelpModal(true)}
               className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors cursor-pointer"
               title="Ayuda y Operaciones POS"
+              aria-label="Ayuda y manual operativo POS"
             >
               <span className="material-symbols-outlined text-[20px]">help</span>
             </button>
           </div>
-
-          <button
-            onClick={onNewClient}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-xs shadow-indigo-600/20 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            Nuevo Cliente
-          </button>
 
           {/* User Profile Avatar & Dropdown */}
           <div className="relative">
@@ -110,6 +118,8 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="flex items-center gap-1.5 p-1 rounded-full border border-slate-200 hover:ring-2 hover:ring-indigo-500/20 transition-all cursor-pointer"
+                title={`Perfil de ${user.name}`}
+                aria-label={`Perfil de ${user.name} (${user.role})`}
               >
                 {user.avatar ? (
                   <img
@@ -127,6 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onOpenLogin}
                 className="bg-slate-100 text-slate-700 font-semibold text-xs px-3.5 py-2 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
+                aria-label="Iniciar Sesión"
               >
                 Iniciar Sesión
               </button>
@@ -184,6 +195,8 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={() => setShowHelpModal(false)}
                 className="text-secondary hover:text-on-surface cursor-pointer"
+                title="Cerrar manual operativo"
+                aria-label="Cerrar manual operativo"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -213,12 +226,14 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Notifications Drawer */}
       {showNotifications && (
-        <div className="absolute right-4 md:right-8 top-16 w-80 bg-white rounded-2xl border border-slate-200/80 shadow-xl p-4 z-50">
+        <div className="absolute right-4 md:right-8 top-16 w-[calc(100vw-2rem)] max-w-xs sm:w-80 bg-white rounded-2xl border border-slate-200/80 shadow-xl p-4 z-50">
           <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2">
             <h4 className="font-bold text-xs text-slate-900">Notificaciones del Sistema</h4>
             <button
               onClick={() => setShowNotifications(false)}
               className="text-slate-400 hover:text-slate-600 cursor-pointer text-xs font-semibold"
+              title="Cerrar notificaciones"
+              aria-label="Cerrar notificaciones"
             >
               Cerrar
             </button>
