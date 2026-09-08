@@ -19,6 +19,17 @@ import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { DebtView } from './components/DebtView';
 import { BankView } from './components/BankView';
+import { Product, Department, Supplier, Location } from './types';
+import { ProductsView } from './components/ProductsView';
+import { ProductFormModal } from './components/ProductFormModal';
+import { ImportProductsModal } from './components/ImportProductsModal';
+import { DepartmentsView } from './components/DepartmentsView';
+import { DepartmentFormModal } from './components/DepartmentFormModal';
+import { SuppliersView } from './components/SuppliersView';
+import { SupplierFormModal } from './components/SupplierFormModal';
+import { LocationsView } from './components/LocationsView';
+import { LocationFormModal } from './components/LocationFormModal';
+import { KitsView } from './components/KitsView';
 
 export default function App() {
   // Auth State
@@ -38,7 +49,7 @@ export default function App() {
       const path = window.location.pathname;
       setPathname(path);
       const viewName = path.replace('/', '') || 'dashboard';
-      if (['dashboard', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings'].includes(viewName)) {
+      if (['dashboard', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings', 'products', 'departments', 'kits', 'suppliers', 'locations'].includes(viewName)) {
         if (viewName === 'admin' && currentUser && currentUser.role !== 'Administrador') {
           window.history.replaceState({}, '', '/clients');
           setPathname('/clients');
@@ -92,6 +103,26 @@ export default function App() {
   const [showPaymentsHistoryModal, setShowPaymentsHistoryModal] = useState(false);
   const [showPurchasesHistoryModal, setShowPurchasesHistoryModal] = useState(false);
 
+  // Products & Inventory Domain State
+  const [products, setProducts] = useState<Product[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  // Inventory Modals
+  const [showProductFormModal, setShowProductFormModal] = useState(false);
+  const [selectedProductForEdit, setSelectedProductForEdit] = useState<Product | null>(null);
+  const [showImportProductsModal, setShowImportProductsModal] = useState(false);
+
+  const [showDepartmentFormModal, setShowDepartmentFormModal] = useState(false);
+  const [selectedDepartmentForEdit, setSelectedDepartmentForEdit] = useState<Department | null>(null);
+
+  const [showSupplierFormModal, setShowSupplierFormModal] = useState(false);
+  const [selectedSupplierForEdit, setSelectedSupplierForEdit] = useState<Supplier | null>(null);
+
+  const [showLocationFormModal, setShowLocationFormModal] = useState(false);
+  const [selectedLocationForEdit, setSelectedLocationForEdit] = useState<Location | null>(null);
+
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Alert Modal for Deletion / Deactivation Business Rules
@@ -117,7 +148,7 @@ export default function App() {
           } else {
             // sync view name based on path
             const viewName = window.location.pathname.replace('/', '') || 'dashboard';
-            if (['dashboard', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings'].includes(viewName)) {
+            if (['dashboard', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings', 'products', 'departments', 'kits', 'suppliers', 'locations'].includes(viewName)) {
               if (viewName === 'admin' && user.role !== 'Administrador') {
                 window.history.replaceState({}, '', '/clients');
                 setPathname('/clients');
@@ -175,11 +206,151 @@ export default function App() {
     }
   };
 
+  // Load products & inventory domain data
+  const loadProductDomainData = async () => {
+    if (typeof api.getProducts !== 'function') return;
+    try {
+      const [prods, depts, sups, locs] = await Promise.all([
+        api.getProducts(),
+        api.getDepartments(),
+        api.getSuppliers(),
+        api.getLocations(),
+      ]);
+      setProducts(prods);
+      setDepartments(depts);
+      setSuppliers(sups);
+      setLocations(locs);
+    } catch (err) {
+      console.error('Error cargando datos de inventario:', err);
+    }
+  };
+
   useEffect(() => {
     if (currentUser) {
       loadData();
+      loadProductDomainData();
     }
   }, [currentUser, searchQuery]);
+
+  // Inventory Handlers
+  const handleOpenNewProduct = () => {
+    setSelectedProductForEdit(null);
+    setShowProductFormModal(true);
+  };
+
+  const handleOpenEditProduct = (product: Product) => {
+    setSelectedProductForEdit(product);
+    setShowProductFormModal(true);
+  };
+
+  const handleSaveProduct = async (productData: Partial<Product>) => {
+    if (selectedProductForEdit) {
+      await api.updateProduct(selectedProductForEdit.id, productData);
+    } else {
+      await api.createProduct(productData);
+    }
+    await loadProductDomainData();
+  };
+
+  const handleDeactivateProduct = async (id: string) => {
+    await api.deactivateProduct(id);
+    await loadProductDomainData();
+  };
+
+  const handleReactivateProduct = async (id: string) => {
+    await api.reactivateProduct(id);
+    await loadProductDomainData();
+  };
+
+  // Departments Handlers
+  const handleOpenNewDepartment = () => {
+    setSelectedDepartmentForEdit(null);
+    setShowDepartmentFormModal(true);
+  };
+
+  const handleOpenEditDepartment = (dept: Department) => {
+    setSelectedDepartmentForEdit(dept);
+    setShowDepartmentFormModal(true);
+  };
+
+  const handleSaveDepartment = async (deptData: { name: string; description?: string }) => {
+    if (selectedDepartmentForEdit) {
+      await api.updateDepartment(selectedDepartmentForEdit.id, deptData);
+    } else {
+      await api.createDepartment(deptData);
+    }
+    await loadProductDomainData();
+  };
+
+  const handleDeactivateDepartment = async (id: string) => {
+    await api.deactivateDepartment(id);
+    await loadProductDomainData();
+  };
+
+  const handleReactivateDepartment = async (id: string) => {
+    await api.reactivateDepartment(id);
+    await loadProductDomainData();
+  };
+
+  // Suppliers Handlers
+  const handleOpenNewSupplier = () => {
+    setSelectedSupplierForEdit(null);
+    setShowSupplierFormModal(true);
+  };
+
+  const handleOpenEditSupplier = (supplier: Supplier) => {
+    setSelectedSupplierForEdit(supplier);
+    setShowSupplierFormModal(true);
+  };
+
+  const handleSaveSupplier = async (supplierData: Partial<Supplier>) => {
+    if (selectedSupplierForEdit) {
+      await api.updateSupplier(selectedSupplierForEdit.id, supplierData);
+    } else {
+      await api.createSupplier(supplierData);
+    }
+    await loadProductDomainData();
+  };
+
+  const handleDeactivateSupplier = async (id: string) => {
+    await api.deactivateSupplier(id);
+    await loadProductDomainData();
+  };
+
+  const handleReactivateSupplier = async (id: string) => {
+    await api.reactivateSupplier(id);
+    await loadProductDomainData();
+  };
+
+  // Locations Handlers
+  const handleOpenNewLocation = () => {
+    setSelectedLocationForEdit(null);
+    setShowLocationFormModal(true);
+  };
+
+  const handleOpenEditLocation = (location: Location) => {
+    setSelectedLocationForEdit(location);
+    setShowLocationFormModal(true);
+  };
+
+  const handleSaveLocation = async (locationData: Partial<Location>) => {
+    if (selectedLocationForEdit) {
+      await api.updateLocation(selectedLocationForEdit.id, locationData);
+    } else {
+      await api.createLocation(locationData);
+    }
+    await loadProductDomainData();
+  };
+
+  const handleDeactivateLocation = async (id: string) => {
+    await api.deactivateLocation(id);
+    await loadProductDomainData();
+  };
+
+  const handleReactivateLocation = async (id: string) => {
+    await api.reactivateLocation(id);
+    await loadProductDomainData();
+  };
 
   // Handlers
   const handleOpenNewClient = () => {
@@ -516,6 +687,7 @@ export default function App() {
         onLogout={handleLogout}
         onExportData={handleExportDataCSV}
         onOpenLogin={() => setShowLoginModal(true)}
+        onOpenImportModal={() => setShowImportProductsModal(true)}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         isMobileOpen={mobileSidebarOpen}
@@ -644,6 +816,73 @@ export default function App() {
                 setCurrentView('reports');
               }}
               onViewStatement={handleOpenStatement}
+            />
+          )}
+
+          {/* VIEW: Products Catalog */}
+          {currentView === 'products' && (
+            <ProductsView
+              products={products}
+              departments={departments}
+              currentUser={currentUser}
+              onNewProduct={handleOpenNewProduct}
+              onEditProduct={handleOpenEditProduct}
+              onDeactivateProduct={(p) => handleDeactivateProduct(p.id)}
+              onReactivateProduct={(p) => handleReactivateProduct(p.id)}
+              onOpenImportModal={() => setShowImportProductsModal(true)}
+              onRefreshData={loadProductDomainData}
+            />
+          )}
+
+          {/* VIEW: Kits / Combos */}
+          {currentView === 'kits' && (
+            <KitsView
+              products={products}
+              currentUser={currentUser}
+              onNewKit={handleOpenNewProduct}
+              onEditKit={handleOpenEditProduct}
+              onDeactivateKit={(k) => handleDeactivateProduct(k.id)}
+              onReactivateKit={(k) => handleReactivateProduct(k.id)}
+              onRefreshData={loadProductDomainData}
+            />
+          )}
+
+          {/* VIEW: Departments */}
+          {currentView === 'departments' && (
+            <DepartmentsView
+              departments={departments}
+              currentUser={currentUser}
+              onNewDepartment={handleOpenNewDepartment}
+              onEditDepartment={handleOpenEditDepartment}
+              onDeactivateDepartment={(d) => handleDeactivateDepartment(d.id)}
+              onReactivateDepartment={(d) => handleReactivateDepartment(d.id)}
+              onRefreshData={loadProductDomainData}
+            />
+          )}
+
+          {/* VIEW: Suppliers */}
+          {currentView === 'suppliers' && (
+            <SuppliersView
+              suppliers={suppliers}
+              currentUser={currentUser}
+              onNewSupplier={handleOpenNewSupplier}
+              onEditSupplier={handleOpenEditSupplier}
+              onDeactivateSupplier={(s) => handleDeactivateSupplier(s.id)}
+              onReactivateSupplier={(s) => handleReactivateSupplier(s.id)}
+              onRefreshData={loadProductDomainData}
+            />
+          )}
+
+          {/* VIEW: Locations */}
+          {currentView === 'locations' && (
+            <LocationsView
+              locations={locations}
+              currentUser={currentUser}
+              onNewLocation={handleOpenNewLocation}
+              onEditLocation={handleOpenEditLocation}
+              onDeactivateLocation={(l) => handleDeactivateLocation(l.id)}
+              onReactivateLocation={(l) => handleReactivateLocation(l.id)}
+              onRefreshData={loadProductDomainData}
             />
           )}
         </main>
@@ -855,6 +1094,49 @@ export default function App() {
           clients={clients}
         />
       )}
+
+      {/* Product Form Modal (both Create & Edit use this exact same component) */}
+      <ProductFormModal
+        isOpen={showProductFormModal}
+        onClose={() => setShowProductFormModal(false)}
+        onSave={handleSaveProduct}
+        initialProduct={selectedProductForEdit}
+        departments={departments}
+        availableComponentProducts={products}
+      />
+
+      {/* Import Products Modal (Excel / CSV) */}
+      <ImportProductsModal
+        isOpen={showImportProductsModal}
+        onClose={() => setShowImportProductsModal(false)}
+        onSuccess={async () => {
+          await loadProductDomainData();
+        }}
+      />
+
+      {/* Department Form Modal */}
+      <DepartmentFormModal
+        isOpen={showDepartmentFormModal}
+        onClose={() => setShowDepartmentFormModal(false)}
+        onSave={handleSaveDepartment}
+        initialDepartment={selectedDepartmentForEdit}
+      />
+
+      {/* Supplier Form Modal */}
+      <SupplierFormModal
+        isOpen={showSupplierFormModal}
+        onClose={() => setShowSupplierFormModal(false)}
+        onSave={handleSaveSupplier}
+        initialSupplier={selectedSupplierForEdit}
+      />
+
+      {/* Location Form Modal */}
+      <LocationFormModal
+        isOpen={showLocationFormModal}
+        onClose={() => setShowLocationFormModal(false)}
+        onSave={handleSaveLocation}
+        initialLocation={selectedLocationForEdit}
+      />
 
       {/* Settings Modal */}
       {showSettingsModal && (

@@ -6,6 +6,14 @@ import {
   AuditLog,
   DashboardMetrics,
   LoanCredit,
+  Location,
+  Department,
+  Supplier,
+  Product,
+  ProductKitComponent,
+  ImportProductsResult,
+  Permission,
+  Role,
 } from '../types';
 
 const TOKEN_KEY = 'credimanage_pos_token';
@@ -19,7 +27,7 @@ const BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   };
 
@@ -316,4 +324,179 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ reason }),
     }),
+
+  // =========================================================================
+  // MÓDULO PRODUCTOS E INVENTARIO - BASE DEL DOMINIO
+  // =========================================================================
+
+  // Locations (Tiendas y Almacenes)
+  getLocations: (params?: { type?: string; active?: string | boolean; q?: string }) => {
+    const urlParams = new URLSearchParams();
+    if (params?.type) urlParams.append('type', params.type);
+    if (params?.active !== undefined) urlParams.append('active', String(params.active));
+    if (params?.q) urlParams.append('q', params.q);
+    return request<Location[]>(`/api/locations?${urlParams.toString()}`);
+  },
+
+  getLocationById: (id: string) => request<Location>(`/api/locations/${id}`),
+
+  createLocation: (data: Partial<Location>) =>
+    request<Location>('/api/locations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateLocation: (id: string, data: Partial<Location>) =>
+    request<Location>(`/api/locations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deactivateLocation: (id: string) =>
+    request<Location>(`/api/locations/${id}/deactivate`, {
+      method: 'PATCH',
+    }),
+
+  reactivateLocation: (id: string) =>
+    request<Location>(`/api/locations/${id}/reactivate`, {
+      method: 'PATCH',
+    }),
+
+  // Departments
+  getDepartments: (params?: { active?: string | boolean; q?: string }) => {
+    const urlParams = new URLSearchParams();
+    if (params?.active !== undefined) urlParams.append('active', String(params.active));
+    if (params?.q) urlParams.append('q', params.q);
+    return request<Department[]>(`/api/departments?${urlParams.toString()}`);
+  },
+
+  getDepartmentById: (id: string) => request<Department>(`/api/departments/${id}`),
+
+  createDepartment: (data: Partial<Department>) =>
+    request<Department>('/api/departments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateDepartment: (id: string, data: Partial<Department>) =>
+    request<Department>(`/api/departments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deactivateDepartment: (id: string) =>
+    request<Department>(`/api/departments/${id}/deactivate`, {
+      method: 'PATCH',
+    }),
+
+  reactivateDepartment: (id: string) =>
+    request<Department>(`/api/departments/${id}/reactivate`, {
+      method: 'PATCH',
+    }),
+
+  deleteDepartment: (id: string) =>
+    request<{ message: string }>(`/api/departments/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // Suppliers
+  getSuppliers: (params?: { active?: string | boolean; q?: string }) => {
+    const urlParams = new URLSearchParams();
+    if (params?.active !== undefined) urlParams.append('active', String(params.active));
+    if (params?.q) urlParams.append('q', params.q);
+    return request<Supplier[]>(`/api/suppliers?${urlParams.toString()}`);
+  },
+
+  getSupplierById: (id: string) => request<Supplier>(`/api/suppliers/${id}`),
+
+  createSupplier: (data: Partial<Supplier>) =>
+    request<Supplier>('/api/suppliers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateSupplier: (id: string, data: Partial<Supplier>) =>
+    request<Supplier>(`/api/suppliers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deactivateSupplier: (id: string) =>
+    request<Supplier>(`/api/suppliers/${id}/deactivate`, {
+      method: 'PATCH',
+    }),
+
+  reactivateSupplier: (id: string) =>
+    request<Supplier>(`/api/suppliers/${id}/reactivate`, {
+      method: 'PATCH',
+    }),
+
+  // Products and Kits
+  getProducts: (params?: {
+    q?: string;
+    departmentId?: string;
+    saleType?: string;
+    active?: string | boolean;
+  }) => {
+    const urlParams = new URLSearchParams();
+    if (params?.q) urlParams.append('q', params.q);
+    if (params?.departmentId) urlParams.append('departmentId', params.departmentId);
+    if (params?.saleType) urlParams.append('saleType', params.saleType);
+    if (params?.active !== undefined) urlParams.append('active', String(params.active));
+    return request<Product[]>(`/api/products?${urlParams.toString()}`);
+  },
+
+  getProductById: (id: string) => request<Product>(`/api/products/${id}`),
+
+  createProduct: (data: any) =>
+    request<Product>('/api/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateProduct: (id: string, data: any) =>
+    request<Product>(`/api/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deactivateProduct: (id: string) =>
+    request<Product>(`/api/products/${id}/deactivate`, {
+      method: 'PATCH',
+    }),
+
+  reactivateProduct: (id: string) =>
+    request<Product>(`/api/products/${id}/reactivate`, {
+      method: 'PATCH',
+    }),
+
+  getProductComponents: (id: string) =>
+    request<ProductKitComponent[]>(`/api/products/${id}/components`),
+
+  importProductsFile: (formData: FormData) =>
+    request<ImportProductsResult>('/api/products/import', {
+      method: 'POST',
+      body: formData,
+    }),
+
+  importProductsRows: (rows: any[]) =>
+    request<ImportProductsResult>('/api/products/import', {
+      method: 'POST',
+      body: JSON.stringify({ rows }),
+    }),
+
+  // Roles & Permissions
+  getRoles: () => request<Role[]>('/api/roles'),
+  getRoleById: (id: string) => request<Role>(`/api/roles/${id}`),
+  createRole: (data: { name: string; description?: string }) =>
+    request<Role>('/api/roles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateRolePermissions: (id: string, permissions: string[]) =>
+    request<Role>(`/api/roles/${id}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify({ permissions }),
+    }),
+  getAllPermissions: () => request<Permission[]>('/api/permissions'),
 };

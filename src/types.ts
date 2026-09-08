@@ -8,10 +8,23 @@ export interface User {
   avatar?: string;
   active: boolean;
   approved?: boolean;
-  createdAt: string;
+  permissions?: string[];
+  createdAt?: string;
 }
 
-export type CurrentView = 'dashboard' | 'clients' | 'debt' | 'bank' | 'reports' | 'admin' | 'settings';
+export type CurrentView =
+  | 'dashboard'
+  | 'clients'
+  | 'debt'
+  | 'bank'
+  | 'reports'
+  | 'admin'
+  | 'settings'
+  | 'products'
+  | 'departments'
+  | 'kits'
+  | 'suppliers'
+  | 'locations';
 
 export type ClientStatus = 'Activo' | 'Desactivado';
 export type PaymentPeriod = 'Semanal' | 'Quincenal' | 'Mensual' | 'Día Fijo';
@@ -215,4 +228,109 @@ export interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+}
+
+// =========================================================================
+// MÓDULO PRODUCTOS E INVENTARIO - ENTREGA 1 (TIPOS FRONTEND)
+// =========================================================================
+
+export type LocationType = 'STORE' | 'WAREHOUSE';
+
+export interface Location {
+  id: string;
+  businessId: string;
+  name: string;
+  code?: string | null;
+  address?: string | null;
+  type: LocationType;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Department {
+  id: string;
+  businessId: string;
+  name: string;
+  description?: string | null;
+  active: boolean;
+  _count?: {
+    products: number;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Supplier {
+  id: string;
+  businessId: string;
+  name: string;
+  taxId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  contactName?: string | null;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type ProductSaleType = 'UNIT' | 'WEIGHT' | 'KIT';
+
+export interface ProductKitComponent {
+  id: string;
+  componentProductId: string;
+  componentSku: string;
+  componentName: string;
+  quantity: number;
+  saleType: ProductSaleType;
+}
+
+export interface Product {
+  id: string;
+  businessId: string;
+  sku: string;
+  barcode?: string | null;
+  name: string;
+  description?: string | null;
+  departmentId?: string | null;
+  departmentName?: string | null;
+  department?: Department | null;
+  saleType: ProductSaleType;
+  costPrice: number;
+  salePrice: number;
+  wholesalePrice: number | null;
+  tracksInventory: boolean;
+  defaultMinStock: number | null;
+  active: boolean;
+  components?: ProductKitComponent[];
+  kitComponents?: any[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ImportProductsResult {
+  success: boolean;
+  totalRowsProcessed: number;
+  createdCount: number;
+  updatedCount: number;
+  departmentsCreated: number;
+  errors: { row: number; error: string; data?: any }[];
+  pendingStockNotice: string;
+}
+
+export interface Permission {
+  id: string;
+  code: string;
+  name: string;
+  module: string;
+  description?: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  isSystem: boolean;
+  permissions?: { permission: Permission }[];
 }
