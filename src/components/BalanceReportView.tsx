@@ -4,8 +4,8 @@ import { api } from '../services/api';
 
 interface BalanceReportViewProps {
   onViewStatement: (client: Client) => void;
-  onEditClient: (client: Client) => void;
-  onPayClient: (client: Client) => void;
+  onEditClient?: (client: Client) => void;
+  onPayClient?: (client: Client) => void;
 }
 
 export const BalanceReportView: React.FC<BalanceReportViewProps> = ({
@@ -168,20 +168,19 @@ export const BalanceReportView: React.FC<BalanceReportViewProps> = ({
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">SALDO TOTAL CONSOLIDADO</th>
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">CRÉDITO DISP.</th>
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-center">ESTADO</th>
-                <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     <span className="material-symbols-outlined animate-spin text-[28px] text-indigo-600">sync</span>
                     <p className="mt-1 text-xs font-medium">Cargando reporte...</p>
                   </td>
                 </tr>
               ) : clients.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
+                  <td colSpan={6} className="py-12 text-center text-slate-400 text-sm">
                     No hay datos registrados para este filtro.
                   </td>
                 </tr>
@@ -201,22 +200,31 @@ export const BalanceReportView: React.FC<BalanceReportViewProps> = ({
                       : 'Sin límite';
 
                   return (
-                    <tr key={client.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-5 py-3">
-                        <span className="text-xs font-semibold text-slate-900">{client.name}</span>
-                        <span className="block font-mono text-[10px] text-slate-400">{client.clientNumber}</span>
+                    <tr
+                      key={client.id}
+                      onClick={() => onViewStatement(client)}
+                      className="hover:bg-slate-50/90 active:bg-indigo-50/40 transition-colors cursor-pointer select-none group"
+                      title={`Clic para ver estado de cuenta de ${client.name}`}
+                    >
+                      <td className="px-5 py-3.5">
+                        <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                          {client.name}
+                        </span>
+                        <span className="block font-mono text-[10px] text-slate-400 font-semibold">
+                          {client.clientNumber}
+                        </span>
                       </td>
 
-                      <td className="px-5 py-3 font-mono text-xs text-slate-500 font-medium">
+                      <td className="px-5 py-3.5 font-mono text-xs text-slate-500 font-medium">
                         {client.phone || 'N/A'}
                       </td>
 
-                      <td className="px-5 py-3 font-mono text-xs text-slate-700 text-right font-medium">
+                      <td className="px-5 py-3.5 font-mono text-xs text-slate-700 text-right font-medium">
                         {client.creditLimit > 0 ? `S/ ${client.creditLimit.toFixed(2)}` : 'Sin límite'}
                       </td>
 
                       <td
-                        className={`px-5 py-3 font-mono text-xs font-extrabold text-right ${
+                        className={`px-5 py-3.5 font-mono text-xs font-extrabold text-right ${
                           hasDebt ? 'text-rose-600' : hasFavor ? 'text-emerald-600' : 'text-slate-700'
                         }`}
                       >
@@ -225,11 +233,11 @@ export const BalanceReportView: React.FC<BalanceReportViewProps> = ({
                           : `S/ ${client.currentBalance.toFixed(2)}`}
                       </td>
 
-                      <td className="px-5 py-3 font-mono text-xs text-slate-700 text-right font-medium">
+                      <td className="px-5 py-3.5 font-mono text-xs text-slate-700 text-right font-medium">
                         {typeof availableCredit === 'number' ? `S/ ${availableCredit.toFixed(2)}` : availableCredit}
                       </td>
 
-                      <td className="px-5 py-3 text-center">
+                      <td className="px-5 py-3.5 text-center">
                         {isOverLimit ? (
                           <span className="inline-block px-2.5 py-0.5 bg-amber-50 text-amber-700 font-bold text-[10px] rounded-full border border-amber-200">
                             Al Límite
@@ -247,32 +255,6 @@ export const BalanceReportView: React.FC<BalanceReportViewProps> = ({
                             Pagado
                           </span>
                         )}
-                      </td>
-
-                      <td className="px-5 py-3 text-right">
-                        <div className="flex justify-end gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => onViewStatement(client)}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                            title="Ver Estado de Cuenta"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
-                          </button>
-                          <button
-                            onClick={() => onPayClient(client)}
-                            className="p-1.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                            title="Abonar / Liquidar"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">payments</span>
-                          </button>
-                          <button
-                            onClick={() => onEditClient(client)}
-                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                            title="Editar"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   );

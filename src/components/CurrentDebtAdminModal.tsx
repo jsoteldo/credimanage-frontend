@@ -353,8 +353,8 @@ export const CurrentDebtAdminModal: React.FC<CurrentDebtAdminModalProps> = ({
                 onClick={() => onOpenAddDebt(currentClient)}
                 className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[18px]">post_add</span>
-                <span>+ Cargar Deuda</span>
+                <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
+                <span>Cargar Deuda</span>
               </button>
 
               {/* Quick Purchase Toggle */}
@@ -362,8 +362,8 @@ export const CurrentDebtAdminModal: React.FC<CurrentDebtAdminModalProps> = ({
                 onClick={() => setShowQuickPurchase(!showQuickPurchase)}
                 className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
-                <span>{showQuickPurchase ? 'Ocultar Compra Rápida' : '+ Nueva Compra'}</span>
+                <span className="material-symbols-outlined text-[18px]">shopping_cart</span>
+                <span>{showQuickPurchase ? 'Ocultar Compra Rápida' : 'Nueva Compra'}</span>
               </button>
             </div>
 
@@ -521,8 +521,8 @@ export const CurrentDebtAdminModal: React.FC<CurrentDebtAdminModalProps> = ({
                     <th className="py-2.5 px-4">Fecha y Hora</th>
                     <th className="py-2.5 px-4">Tipo</th>
                     <th className="py-2.5 px-4">Concepto / Comprobante</th>
-                    <th className="py-2.5 px-4 text-right">Cargo (+)</th>
-                    <th className="py-2.5 px-4 text-right">Abono (-)</th>
+                    <th className="py-2.5 px-4 text-right">Cargo</th>
+                    <th className="py-2.5 px-4 text-right">Abono</th>
                     <th className="py-2.5 px-4 text-right">Saldo Progresivo</th>
                     <th className="py-2.5 px-4">Registrado Por</th>
                     <th className="py-2.5 px-4 text-center">Estado</th>

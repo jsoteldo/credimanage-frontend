@@ -92,13 +92,17 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
 
   if (!isOpen) return null;
 
-  const currentBalance = selectedClient ? selectedClient.currentBalance : 0;
+  const currentDailyDebt = selectedClient
+    ? Math.max(0, selectedClient.dailyDebtBalance ?? selectedClient.currentBalance)
+    : 0;
+  const currentBalance = currentDailyDebt;
   const numUnitPrice = parseFloat(String(unitPrice)) || 0;
   const numQuantity = Math.max(1, quantity || 1);
   const totalChargeAmount = Math.round(numUnitPrice * numQuantity * 100) / 100;
-  const projectedBalance = Math.round((currentBalance + totalChargeAmount) * 100) / 100;
+  const projectedBalance = Math.round((currentDailyDebt + totalChargeAmount) * 100) / 100;
+  const projectedDailyDebt = projectedBalance;
   const creditLimit = selectedClient?.creditLimit || 0;
-  const isOverLimit = creditLimit > 0 && projectedBalance > creditLimit;
+  const isOverLimit = creditLimit > 0 && projectedDailyDebt > creditLimit;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,11 +131,11 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
 
     if (isOverLimit) {
       setError(
-        `El cargo supera el límite de crédito disponible del cliente (Límite: S/ ${creditLimit.toFixed(
+        `El cargo supera el límite de compras del cliente (Límite: S/ ${creditLimit.toFixed(
           2
-        )}, Saldo proyectado: S/ ${projectedBalance.toFixed(2)}, Exceso: S/ ${(
-          projectedBalance - creditLimit
-        ).toFixed(2)}).`
+        )}, Deuda actual de compras: S/ ${currentDailyDebt.toFixed(2)}, Proyectado: S/ ${projectedDailyDebt.toFixed(
+          2
+        )}, Exceso: S/ ${(projectedDailyDebt - creditLimit).toFixed(2)}).`
       );
       return;
     }
@@ -195,7 +199,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
           )}
 
           {/* Form Body */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
             {/* Reusable Client Selector in Debt Mode */}
             <ClientSelector
               selectedClient={selectedClient}
@@ -205,6 +209,7 @@ export const AddDebtModal: React.FC<AddDebtModalProps> = ({
               label="Cliente Destino *"
               disabled={loading}
               onClientCreated={onClientCreated}
+              maxVisibleItems={3}
             />
 
             {/* Concept / Product */}

@@ -68,8 +68,8 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                 onClick={onNewLocation}
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[20px]">add</span>
-                <span>+ Nueva Ubicación</span>
+                <span className="material-symbols-outlined text-[20px]">store</span>
+                <span>Nueva Ubicación</span>
               </button>
             )}
           </>
@@ -117,24 +117,30 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
               <th className="py-3.5 px-4">Tipo</th>
               <th className="py-3.5 px-4">Dirección</th>
               <th className="py-3.5 px-4 text-center">Estado</th>
-              <th className="py-3.5 px-4 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-slate-400">
+                <td colSpan={5} className="py-10 text-center text-slate-400">
                   No hay ubicaciones registradas.
                 </td>
               </tr>
             ) : (
               filtered.map((loc) => (
-                <tr key={loc.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                <tr
+                  key={loc.id}
+                  onClick={() => allowManage && onEditLocation(loc)}
+                  className={`hover:bg-slate-50/80 transition-colors select-none ${
+                    allowManage ? 'cursor-pointer' : ''
+                  } ${!loc.active ? 'opacity-60 bg-slate-50/30' : ''}`}
+                  title={allowManage ? 'Editar ubicación' : undefined}
+                >
+                  <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
                     {loc.code || <span className="text-slate-300 font-normal">--</span>}
                   </td>
-                  <td className="py-3 px-4 font-bold text-slate-900">{loc.name}</td>
-                  <td className="py-3 px-4">
+                  <td className="py-3.5 px-4 font-bold text-slate-900">{loc.name}</td>
+                  <td className="py-3.5 px-4">
                     {loc.type === 'STORE' ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700">
                         <span className="material-symbols-outlined text-[12px]">storefront</span>
@@ -147,10 +153,10 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                       </span>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-slate-500">
+                  <td className="py-3.5 px-4 text-slate-500">
                     {loc.address || <span className="text-slate-300">Sin dirección especificada</span>}
                   </td>
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-3.5 px-4 text-center">
                     <span
                       className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         loc.active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
@@ -158,38 +164,6 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                     >
                       {loc.active ? 'Activo' : 'Inactivo'}
                     </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      {allowManage && (
-                        <>
-                          <button
-                            onClick={() => onEditLocation(loc)}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                            title="Editar ubicación"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                          </button>
-                          {loc.active ? (
-                            <button
-                              onClick={() => onDeactivateLocation(loc)}
-                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Desactivar ubicación"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">block</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => onReactivateLocation(loc)}
-                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                              title="Reactivar ubicación"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
                   </td>
                 </tr>
               ))

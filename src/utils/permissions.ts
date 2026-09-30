@@ -6,7 +6,7 @@ import { User } from '../types';
  * Administrador role always has access as safety fallback.
  */
 export function hasPermission(user: User | null, permissionCode: string): boolean {
-  if (!user || !user.active) return false;
+  if (!user || user.active === false) return false;
 
   // System Administrator fallback
   if (user.role === 'Administrador') {

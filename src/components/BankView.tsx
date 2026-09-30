@@ -153,7 +153,7 @@ export const BankView: React.FC<BankViewProps> = ({
             onClick={() => handleOpenGrantLoan()}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all shadow-xs shadow-indigo-600/30 cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-[18px]">add_circle</span>
+            <span className="material-symbols-outlined text-[18px]">payments</span>
             <span>Otorgar Crédito con Intereses</span>
           </button>
         }

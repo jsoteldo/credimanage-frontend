@@ -6,6 +6,8 @@ interface SupplierFormModalProps {
   onClose: () => void;
   onSave: (data: any) => Promise<void>;
   initialSupplier?: Supplier | null;
+  onDeactivateSupplier?: (supplier: Supplier) => Promise<void>;
+  onReactivateSupplier?: (supplier: Supplier) => Promise<void>;
   zIndexClass?: string;
 }
 
@@ -14,6 +16,8 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
   onClose,
   onSave,
   initialSupplier,
+  onDeactivateSupplier,
+  onReactivateSupplier,
   zIndexClass = 'z-50',
 }) => {
   const [name, setName] = useState('');
@@ -186,24 +190,81 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
             />
           </div>
 
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {loading ? 'hourglass_top' : 'save'}
-              </span>
-              <span>{loading ? 'Guardando...' : initialSupplier ? 'Actualizar' : 'Crear'}</span>
-            </button>
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+            {/* Left Action: Desactivar / Reactivar Proveedor */}
+            <div className="shrink-0">
+              {initialSupplier && (
+                initialSupplier.active ? (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={async () => {
+                      if (onDeactivateSupplier) {
+                        try {
+                          setLoading(true);
+                          await onDeactivateSupplier(initialSupplier);
+                          onClose();
+                        } catch (err: any) {
+                          setError(err.message || 'Error al desactivar el proveedor');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }
+                    }}
+                    className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Desactivar este proveedor"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">block</span>
+                    <span>Desactivar Proveedor</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={async () => {
+                      if (onReactivateSupplier) {
+                        try {
+                          setLoading(true);
+                          await onReactivateSupplier(initialSupplier);
+                          onClose();
+                        } catch (err: any) {
+                          setError(err.message || 'Error al reactivar el proveedor');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }
+                    }}
+                    className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Reactivar este proveedor"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    <span>Reactivar Proveedor</span>
+                  </button>
+                )
+              )}
+            </div>
+
+            {/* Right Actions: Cancelar and Actualizar / Crear */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {loading ? 'hourglass_top' : 'save'}
+                </span>
+                <span>{loading ? 'Guardando...' : initialSupplier ? 'Actualizar' : 'Crear'}</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

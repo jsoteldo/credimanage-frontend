@@ -58,16 +58,13 @@ describe('GrantLoanModal Component Characterization', () => {
     expect(screen.getByText(/2,400\.00/i)).toBeInTheDocument();
   });
 
-  it('blocks submission and disables submit button when projected balance exceeds credit limit', async () => {
-    const user = userEvent.setup();
+  it('allows granting loan even when client has reached or exceeded credit limit', async () => {
     // Cliente Test A: creditLimit = 1000, currentBalance = 300.
     // Capital 1000 + 10% = 1100 -> projected = 1400 > 1000 limit
     render(<GrantLoanModal {...defaultProps} initialClientId="cli-001" />);
 
-    expect(screen.getByText(/⚠️ \(Excedido\)/i)).toBeInTheDocument();
-
     const submitBtn = screen.getByRole('button', { name: /Otorgar Crédito/i });
-    expect(submitBtn).toBeDisabled();
+    expect(submitBtn).not.toBeDisabled();
   });
 
   it('opens LoanScheduleModal when clicking Previsualizar Cronograma', async () => {

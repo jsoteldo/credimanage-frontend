@@ -58,8 +58,8 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
                 onClick={onNewDepartment}
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[20px]">add</span>
-                <span>+ Nuevo Departamento</span>
+                <span className="material-symbols-outlined text-[20px]">category</span>
+                <span>Nuevo Departamento</span>
               </button>
             )}
           </>
@@ -99,27 +99,33 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
               <th className="py-3.5 px-4">Descripción</th>
               <th className="py-3.5 px-4 text-center">Productos Asociados</th>
               <th className="py-3.5 px-4 text-center">Estado</th>
-              <th className="py-3.5 px-4 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-slate-400">
+                <td colSpan={4} className="py-10 text-center text-slate-400">
                   No hay departamentos registrados.
                 </td>
               </tr>
             ) : (
               filtered.map((dept) => (
-                <tr key={dept.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 font-bold text-slate-900">{dept.name}</td>
-                  <td className="py-3 px-4 text-slate-500">
+                <tr
+                  key={dept.id}
+                  onClick={() => allowManage && onEditDepartment(dept)}
+                  className={`hover:bg-slate-50/80 transition-colors select-none ${
+                    allowManage ? 'cursor-pointer' : ''
+                  } ${!dept.active ? 'opacity-60 bg-slate-50/30' : ''}`}
+                  title={allowManage ? 'Editar departamento' : undefined}
+                >
+                  <td className="py-3.5 px-4 font-bold text-slate-900">{dept.name}</td>
+                  <td className="py-3.5 px-4 text-slate-500">
                     {dept.description || <span className="text-slate-300">Sin descripción</span>}
                   </td>
-                  <td className="py-3 px-4 text-center font-bold text-indigo-700">
+                  <td className="py-3.5 px-4 text-center font-bold text-indigo-700">
                     {dept._count?.products || 0}
                   </td>
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-3.5 px-4 text-center">
                     <span
                       className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         dept.active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
@@ -127,47 +133,6 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
                     >
                       {dept.active ? 'Activo' : 'Inactivo'}
                     </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      {allowManage && (
-                        <>
-                          <button
-                            onClick={() => onEditDepartment(dept)}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                            title="Editar departamento"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                          </button>
-                          {dept.active ? (
-                            <button
-                              onClick={() => onDeactivateDepartment(dept)}
-                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Desactivar departamento"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">block</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => onReactivateDepartment(dept)}
-                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                              title="Reactivar departamento"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                            </button>
-                          )}
-                          {(dept._count?.products || 0) === 0 && (
-                            <button
-                              onClick={() => onDeleteDepartment(dept)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Eliminar departamento vacío"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">delete</span>
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
                   </td>
                 </tr>
               ))

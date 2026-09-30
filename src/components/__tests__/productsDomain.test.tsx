@@ -4,10 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { ProductsView } from '../ProductsView';
 import { ProductFormModal } from '../ProductFormModal';
+import { DepartmentFormModal } from '../DepartmentFormModal';
+import { LocationFormModal } from '../LocationFormModal';
 import { KitsView } from '../KitsView';
 import { ImportProductsModal } from '../ImportProductsModal';
 import { DepartmentsView } from '../DepartmentsView';
 import { SuppliersView } from '../SuppliersView';
+import { SupplierFormModal } from '../SupplierFormModal';
 import { LocationsView } from '../LocationsView';
 import { Product, Department, Supplier, Location, User } from '../../types';
 import { hasPermission, canCreateProduct, canManageProducts } from '../../utils/permissions';
@@ -215,7 +218,7 @@ describe('Entrega 1: Products & Inventory Base Domain (Frontend Tests)', () => {
         />
       );
 
-      const newBtn = screen.getByRole('button', { name: /\+ Nuevo Producto/i });
+      const newBtn = screen.getByRole('button', { name: /Nuevo Producto/i });
       await user.click(newBtn);
       expect(handleNew).toHaveBeenCalledTimes(1);
     });
@@ -235,7 +238,7 @@ describe('Entrega 1: Products & Inventory Base Domain (Frontend Tests)', () => {
         />
       );
 
-      expect(screen.queryByRole('button', { name: /\+ Nuevo Producto/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Nuevo Producto/i })).toBeNull();
     });
 
     it('filters products by search input', async () => {
@@ -258,6 +261,77 @@ describe('Entrega 1: Products & Inventory Base Domain (Frontend Tests)', () => {
 
       expect(screen.getAllByText('Queso Andino').length).toBeGreaterThanOrEqual(1);
       expect(screen.queryByText('Combo Parrillero')).toBeNull();
+    });
+
+    it('clicking on a product row triggers onEditProduct', async () => {
+      const handleEdit = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <ProductsView
+          products={mockProducts}
+          departments={mockDepartments}
+          currentUser={mockAdminUser}
+          onNewProduct={vi.fn()}
+          onEditProduct={handleEdit}
+          onOpenImportModal={vi.fn()}
+          onRefreshData={vi.fn()}
+        />
+      );
+
+      const rows = screen.getAllByTitle('Editar producto');
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+      await user.click(rows[0]);
+      expect(handleEdit).toHaveBeenCalledWith(mockProducts[0]);
+    });
+
+    it('filters products when clicking on KPI cards (Total Catálogo, Venta Unitaria, A Granel / Peso, Kits / Combos)', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <ProductsView
+          products={mockProducts}
+          departments={mockDepartments}
+          currentUser={mockAdminUser}
+          onNewProduct={vi.fn()}
+          onEditProduct={vi.fn()}
+          onOpenImportModal={vi.fn()}
+          onRefreshData={vi.fn()}
+        />
+      );
+
+      // Initially all products are visible
+      expect(screen.getAllByText('Gaseosa Cola 1.5L').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Queso Andino').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Combo Parrillero').length).toBeGreaterThanOrEqual(1);
+
+      // Click "Venta Unitaria" KPI card
+      const unitKpi = screen.getByTitle('Filtrar por productos de venta unitaria');
+      await user.click(unitKpi);
+      expect(screen.getAllByText('Gaseosa Cola 1.5L').length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText('Queso Andino')).toBeNull();
+      expect(screen.queryByText('Combo Parrillero')).toBeNull();
+
+      // Click "A Granel / Peso" KPI card
+      const weightKpi = screen.getByTitle('Filtrar por productos a granel o peso');
+      await user.click(weightKpi);
+      expect(screen.getAllByText('Queso Andino').length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText('Gaseosa Cola 1.5L')).toBeNull();
+      expect(screen.queryByText('Combo Parrillero')).toBeNull();
+
+      // Click "Kits / Combos" KPI card
+      const kitKpi = screen.getByTitle('Filtrar por kits y combos compuestos');
+      await user.click(kitKpi);
+      expect(screen.getAllByText('Combo Parrillero').length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText('Gaseosa Cola 1.5L')).toBeNull();
+      expect(screen.queryByText('Queso Andino')).toBeNull();
+
+      // Click "Total Catálogo" KPI card to reset
+      const totalKpi = screen.getByTitle('Mostrar todos los productos registrados');
+      await user.click(totalKpi);
+      expect(screen.getAllByText('Gaseosa Cola 1.5L').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Queso Andino').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Combo Parrillero').length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -339,6 +413,137 @@ describe('Entrega 1: Products & Inventory Base Domain (Frontend Tests)', () => {
       // Error message should appear and save must not be called
       expect(screen.getByText(/debe tener al menos un componente/i)).toBeDefined();
       expect(handleSave).not.toHaveBeenCalled();
+    });
+
+    it('renders Desactivar Producto in bottom-left when editing active product and triggers onDeactivateProduct', async () => {
+      const handleDeactivate = vi.fn().mockResolvedValue(undefined);
+      const handleClose = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <ProductFormModal
+          isOpen={true}
+          onClose={handleClose}
+          onSave={vi.fn()}
+          initialProduct={mockProducts[0]}
+          departments={mockDepartments}
+          availableComponentProducts={mockProducts}
+          onDeactivateProduct={handleDeactivate}
+        />
+      );
+
+      const deactivateBtn = screen.getByRole('button', { name: /Desactivar Producto/i });
+      expect(deactivateBtn).toBeDefined();
+      await user.click(deactivateBtn);
+      expect(handleDeactivate).toHaveBeenCalledWith(mockProducts[0]);
+      expect(handleClose).toHaveBeenCalled();
+    });
+
+    it('manages Kit components with controlled height container, counter, edit quantity, remove and submit without limits', async () => {
+      const handleSave = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+
+      // Provide multiple mock component products so we can add >5 components
+      const testAvailableProducts: Product[] = Array.from({ length: 8 }, (_, i) => ({
+        id: `comp-prod-${i + 1}`,
+        businessId: 'default',
+        sku: `COMP-${i + 1}`,
+        barcode: null,
+        name: `Componente Insumo ${i + 1}`,
+        description: null,
+        departmentId: 'dept-1',
+        saleType: 'UNIT',
+        costPrice: 2.0,
+        salePrice: 5.0,
+        wholesalePrice: null,
+        tracksInventory: true,
+        defaultMinStock: 5,
+        active: true,
+      }));
+
+      render(
+        <ProductFormModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onSave={handleSave}
+          initialProduct={null}
+          departments={mockDepartments}
+          availableComponentProducts={testAvailableProducts}
+        />
+      );
+
+      // Select KIT sale type
+      const saleTypeSelect = screen.getByDisplayValue('Unidad (Entera)');
+      fireEvent.change(saleTypeSelect, { target: { value: 'KIT' } });
+
+      // C. Invariant: Component list container has controlled max-height and discrete scroll styling
+      const addBtn = screen.getByRole('button', { name: /Agregar Componente/i });
+      expect(addBtn).toBeDefined();
+
+      // Check initial counter: 0 componentes
+      expect(screen.getByTestId('kit-components-count').textContent).toContain('0 componentes');
+
+      // A & F: Add 6 components (> 5, proving no artificial limit)
+      for (let i = 0; i < 6; i++) {
+        await user.click(addBtn);
+      }
+
+      // Counter should display 6 componentes
+      expect(screen.getByTestId('kit-components-count').textContent).toContain('6 componentes');
+
+      // C. Verify list container has controlled max-height class (3 items max)
+      const listContainer = screen.getByTestId('kit-components-list-container');
+      expect(listContainer).toBeDefined();
+      expect(listContainer.className).toContain('max-h-[160px]');
+      expect(listContainer.className).toContain('overflow-y-auto');
+
+      // E. Quantity is editable
+      const quantityInputs = screen.getAllByPlaceholderText('1');
+      expect(quantityInputs.length).toBe(6);
+      await user.clear(quantityInputs[0]);
+      await user.type(quantityInputs[0], '3.5');
+
+      // D. Remove a component
+      const deleteButtons = screen.getAllByTitle('Eliminar componente');
+      expect(deleteButtons.length).toBe(6);
+      await user.click(deleteButtons[5]); // Remove 6th
+
+      // Counter updates to 5 componentes
+      expect(screen.getByTestId('kit-components-count').textContent).toContain('5 componentes');
+
+      // Fill basic required fields and submit
+      const skuInput = screen.getByPlaceholderText('Ej. REF-001');
+      await user.clear(skuInput);
+      await user.type(skuInput, 'KIT-SUPER');
+
+      const nameInput = screen.getByPlaceholderText('Ej. Harina de Maíz Precocida 1kg');
+      await user.type(nameInput, 'Combo Megapack');
+
+      const priceInputs = screen.getAllByPlaceholderText('0.00');
+      await user.type(priceInputs[1], '50.00');
+
+      const submitBtn = screen.getByRole('button', { name: /Crear Producto/i });
+      await user.click(submitBtn);
+
+      // B. All 5 components exist in the submitted payload with edited quantity
+      await waitFor(() => {
+        expect(handleSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sku: 'KIT-SUPER',
+            name: 'Combo Megapack',
+            saleType: 'KIT',
+            components: expect.arrayContaining([
+              expect.objectContaining({
+                componentProductId: 'comp-prod-1',
+                quantity: 3.5,
+              }),
+            ]),
+          })
+        );
+      });
+
+      const calledPayload = handleSave.mock.calls[0][0];
+      expect(calledPayload.components.length).toBe(5);
     });
   });
 
@@ -424,6 +629,50 @@ describe('Entrega 1: Products & Inventory Base Domain (Frontend Tests)', () => {
       expect(screen.getByText('20123456789')).toBeDefined();
     });
 
+    it('clicking on a supplier row triggers onEditSupplier', async () => {
+      const handleEdit = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <SuppliersView
+          suppliers={mockSuppliers}
+          currentUser={mockAdminUser}
+          onNewSupplier={vi.fn()}
+          onEditSupplier={handleEdit}
+          onDeactivateSupplier={vi.fn()}
+          onReactivateSupplier={vi.fn()}
+          onRefreshData={vi.fn()}
+        />
+      );
+
+      const rows = screen.getAllByTitle('Clic para editar proveedor');
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+      await user.click(rows[0]);
+      expect(handleEdit).toHaveBeenCalledWith(mockSuppliers[0]);
+    });
+
+    it('renders Desactivar Proveedor in SupplierFormModal when editing active supplier', async () => {
+      const handleDeactivate = vi.fn().mockResolvedValue(undefined);
+      const handleClose = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <SupplierFormModal
+          isOpen={true}
+          onClose={handleClose}
+          onSave={vi.fn()}
+          initialSupplier={mockSuppliers[0]}
+          onDeactivateSupplier={handleDeactivate}
+        />
+      );
+
+      const deactivateBtn = screen.getByRole('button', { name: /Desactivar Proveedor/i });
+      expect(deactivateBtn).toBeDefined();
+      await user.click(deactivateBtn);
+      expect(handleDeactivate).toHaveBeenCalledWith(mockSuppliers[0]);
+      expect(handleClose).toHaveBeenCalled();
+    });
+
     it('renders locations with badges', () => {
       render(
         <LocationsView
@@ -442,6 +691,72 @@ describe('Entrega 1: Products & Inventory Base Domain (Frontend Tests)', () => {
       expect(screen.getByText('Almacén Central')).toBeDefined();
       expect(screen.getByText('TIENDA-01')).toBeDefined();
       expect(screen.getByText('ALMACEN-01')).toBeDefined();
+    });
+
+    it('clicking on a location row triggers onEditLocation', async () => {
+      const handleEdit = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <LocationsView
+          locations={mockLocations}
+          currentUser={mockAdminUser}
+          onNewLocation={vi.fn()}
+          onEditLocation={handleEdit}
+          onDeactivateLocation={vi.fn()}
+          onReactivateLocation={vi.fn()}
+          onRefreshData={vi.fn()}
+        />
+      );
+
+      const rows = screen.getAllByTitle('Editar ubicación');
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+      await user.click(rows[0]);
+      expect(handleEdit).toHaveBeenCalledWith(mockLocations[0]);
+    });
+
+    it('renders Desactivar Departamento in DepartmentFormModal when editing active department', async () => {
+      const handleDeactivate = vi.fn().mockResolvedValue(undefined);
+      const handleClose = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <DepartmentFormModal
+          isOpen={true}
+          onClose={handleClose}
+          onSave={vi.fn()}
+          initialDepartment={mockDepartments[0]}
+          onDeactivateDepartment={handleDeactivate}
+        />
+      );
+
+      const deactivateBtn = screen.getByRole('button', { name: /Desactivar Departamento/i });
+      expect(deactivateBtn).toBeDefined();
+      await user.click(deactivateBtn);
+      expect(handleDeactivate).toHaveBeenCalledWith(mockDepartments[0]);
+      expect(handleClose).toHaveBeenCalled();
+    });
+
+    it('renders Desactivar Ubicación in LocationFormModal when editing active location', async () => {
+      const handleDeactivate = vi.fn().mockResolvedValue(undefined);
+      const handleClose = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <LocationFormModal
+          isOpen={true}
+          onClose={handleClose}
+          onSave={vi.fn()}
+          initialLocation={mockLocations[0]}
+          onDeactivateLocation={handleDeactivate}
+        />
+      );
+
+      const deactivateBtn = screen.getByRole('button', { name: /Desactivar Ubicación/i });
+      expect(deactivateBtn).toBeDefined();
+      await user.click(deactivateBtn);
+      expect(handleDeactivate).toHaveBeenCalledWith(mockLocations[0]);
+      expect(handleClose).toHaveBeenCalled();
     });
   });
 });

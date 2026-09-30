@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Client } from '../types';
+import { api } from '../services/api';
+import {
+  interpolateWhatsAppTemplate,
+  DEFAULT_WHATSAPP_REMINDER_TEMPLATE,
+} from '../utils/whatsappReminder';
 
 interface PaymentRemindersModalProps {
   isOpen: boolean;
@@ -8,6 +13,7 @@ interface PaymentRemindersModalProps {
   onPayClient: (client: Client) => void;
   onAddDebtClient: (client: Client) => void;
   onViewStatement: (client: Client) => void;
+  onOpenReminderConfig?: () => void;
 }
 
 export const PaymentRemindersModal: React.FC<PaymentRemindersModalProps> = ({
@@ -17,9 +23,31 @@ export const PaymentRemindersModal: React.FC<PaymentRemindersModalProps> = ({
   onPayClient,
   onAddDebtClient,
   onViewStatement,
+  onOpenReminderConfig,
 }) => {
   const [filterPeriod, setFilterPeriod] = useState<string>('TODOS');
   const [statusFilter, setStatusFilter] = useState<'HOY_VENCIDO' | 'PROXIMOS' | 'TODOS'>('HOY_VENCIDO');
+  const [reminderTemplate, setReminderTemplate] = useState<string>(
+    DEFAULT_WHATSAPP_REMINDER_TEMPLATE,
+  );
+  const [clientForWhatsApp, setClientForWhatsApp] = useState<Client | null>(null);
+  const [sendWhatsAppMessage, setSendWhatsAppMessage] = useState<string>('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      api
+        .getWhatsAppReminderConfig()
+        .then((cfg) => {
+          if (cfg && cfg.template) {
+            setReminderTemplate(cfg.template);
+          }
+        })
+        .catch((err) => {
+          console.warn('Usando plantilla predeterminada de WhatsApp:', err);
+        });
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -54,17 +82,18 @@ export const PaymentRemindersModal: React.FC<PaymentRemindersModalProps> = ({
     displayedClients = displayedClients.filter((c) => c.paymentPeriod === filterPeriod);
   }
 
-  // Send WhatsApp reminder helper
+  // Send WhatsApp reminder helper: validates phone & opens confirmation modal with editable text
   const handleWhatsAppReminder = (client: Client) => {
-    const cleanPhone = client.phone.replace(/[^0-9]/g, '');
-    const text = encodeURIComponent(
-      `Hola ${client.name}, le saludamos de CrediManage. Le recordamos amablemente que cuenta con un saldo pendiente de S/ ${client.currentBalance.toFixed(
-        2
-      )} PEN. Su fecha de pago programada (${client.paymentPeriod || 'Mensual'}) es ${
-        client.nextDueDate || 'próxima'
-      }. ¡Agradecemos su preferencia!`
-    );
-    window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+    setPhoneError(null);
+    const rawPhone = client.phone || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    if (!cleanPhone || cleanPhone.trim() === '') {
+      setPhoneError('El cliente no tiene un número de teléfono registrado.');
+      return;
+    }
+    const initialText = interpolateWhatsAppTemplate(reminderTemplate, client);
+    setClientForWhatsApp(client);
+    setSendWhatsAppMessage(initialText);
   };
 
   return (
@@ -85,15 +114,43 @@ export const PaymentRemindersModal: React.FC<PaymentRemindersModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
-            title="Cerrar modal"
-            aria-label="Cerrar modal"
-          >
-            <span className="material-symbols-outlined text-[20px]">close</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenReminderConfig && (
+              <button
+                type="button"
+                onClick={onOpenReminderConfig}
+                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Configurar plantilla predeterminada de mensajes de cobranza por WhatsApp"
+              >
+                <span className="material-symbols-outlined text-[16px]">tune</span>
+                <span>Configurar Plantilla</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Cerrar modal"
+              aria-label="Cerrar modal"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
         </div>
+
+        {/* Controlled Phone Error Banner */}
+        {phoneError && (
+          <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-rose-600 shrink-0">error</span>
+            <span className="flex-1">{phoneError}</span>
+            <button
+              type="button"
+              onClick={() => setPhoneError(null)}
+              className="text-rose-500 hover:text-rose-700 cursor-pointer p-0.5"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          </div>
+        )}
 
         {/* Top Summary Badges */}
         <div className="px-6 py-3 bg-slate-50/60 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
@@ -263,16 +320,22 @@ export const PaymentRemindersModal: React.FC<PaymentRemindersModalProps> = ({
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-2 shrink-0 border-t md:border-t-0 pt-2 md:pt-0 border-slate-200">
-                      {client.phone && (
-                        <button
-                          onClick={() => handleWhatsAppReminder(client)}
-                          className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                          title="Enviar Recordatorio por WhatsApp"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">chat</span>
-                          <span className="hidden sm:inline">WhatsApp</span>
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleWhatsAppReminder(client)}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                          client.phone && client.phone.trim() !== ''
+                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200'
+                            : 'bg-slate-50 text-slate-400 hover:bg-slate-100 border-slate-200'
+                        }`}
+                        title={
+                          client.phone && client.phone.trim() !== ''
+                            ? 'Enviar Recordatorio por WhatsApp'
+                            : 'Sin teléfono registrado'
+                        }
+                      >
+                        <span className="material-symbols-outlined text-[16px]">chat</span>
+                        <span className="hidden sm:inline">WhatsApp</span>
+                      </button>
 
                       <button
                         onClick={() => {
@@ -317,6 +380,94 @@ export const PaymentRemindersModal: React.FC<PaymentRemindersModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Confirmation & Edit Before Send Modal (Overlaid at z-[60]) */}
+      {clientForWhatsApp && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col space-y-4 p-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                  <span className="material-symbols-outlined text-[20px]">chat</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Enviar Recordatorio por WhatsApp
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Verifica o personaliza el mensaje antes de abrir WhatsApp.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setClientForWhatsApp(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Client summary box */}
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/70 flex justify-between items-center text-xs">
+              <div>
+                <span className="font-mono text-[10px] text-slate-400 font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                  {clientForWhatsApp.clientNumber}
+                </span>
+                <p className="font-bold text-slate-900 mt-1">{clientForWhatsApp.name}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Teléfono Destino</span>
+                <span className="font-mono font-bold text-slate-700">{clientForWhatsApp.phone}</span>
+              </div>
+            </div>
+
+            {/* Editable Textarea */}
+            <div className="space-y-1.5">
+              <label htmlFor="sendWhatsAppText" className="block text-xs font-bold text-slate-700">
+                Mensaje a enviar por WhatsApp (editable para este envío):
+              </label>
+              <textarea
+                id="sendWhatsAppText"
+                rows={7}
+                value={sendWhatsAppMessage}
+                onChange={(e) => setSendWhatsAppMessage(e.target.value)}
+                className="w-full p-3 border border-slate-200 rounded-xl bg-white font-sans text-xs md:text-sm text-slate-800 leading-relaxed outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-y"
+              />
+              <p className="text-[10px] text-slate-400 italic">
+                * La edición en esta ventana aplica únicamente a este envío y no modifica la plantilla global del sistema.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setClientForWhatsApp(null)}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const cleanPhone = (clientForWhatsApp.phone || '').replace(/[^0-9]/g, '');
+                  window.open(
+                    `https://wa.me/${cleanPhone}?text=${encodeURIComponent(sendWhatsAppMessage)}`,
+                    '_blank'
+                  );
+                  setClientForWhatsApp(null);
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">send</span>
+                Abrir WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

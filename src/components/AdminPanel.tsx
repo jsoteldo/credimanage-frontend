@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { User, AuditLog, CreditPurchase, Payment, Client } from '../types';
 import { api } from '../services/api';
+import { WhatsAppReminderConfigView } from './WhatsAppReminderConfigView';
 
 interface AdminPanelProps {
   currentUser: User | null;
+  initialTab?: 'audit' | 'users' | 'annulled' | 'portfolio' | 'pending_payments' | 'messages';
   onNavigateToClients: () => void;
   onNavigateToReports: () => void;
   onViewStatement: (client: Client) => void;
@@ -11,11 +13,18 @@ interface AdminPanelProps {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   currentUser,
+  initialTab = 'audit',
   onNavigateToClients,
   onNavigateToReports,
   onViewStatement,
 }) => {
-  const [activeTab, setActiveTab] = useState<'audit' | 'users' | 'annulled' | 'portfolio' | 'pending_payments'>('audit');
+  const [activeTab, setActiveTab] = useState<'audit' | 'users' | 'annulled' | 'portfolio' | 'pending_payments' | 'messages'>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   
   // Data state
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -225,6 +234,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         >
           <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
           Consultas de Deuda & Saldos a Favor
+        </button>
+
+        <button
+          onClick={() => setActiveTab('messages')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
+            activeTab === 'messages'
+              ? 'bg-indigo-600 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-200/70 font-semibold'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">chat</span>
+          Mensajes • Recordatorio de Cobranza
         </button>
       </div>
 
@@ -689,6 +710,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </table>
           </div>
         </div>
+      )}
+
+      {/* Tab: Mensajes • Recordatorio de Cobranza */}
+      {activeTab === 'messages' && (
+        <WhatsAppReminderConfigView currentUser={currentUser} />
       )}
 
       {/* Modal: New User */}

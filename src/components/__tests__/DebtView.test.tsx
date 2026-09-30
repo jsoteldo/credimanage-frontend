@@ -109,7 +109,7 @@ describe('DebtView Component Characterization', () => {
       screen.getByText('No hay clientes con deuda corriente pendiente.')
     ).toBeInTheDocument();
 
-    const addDebtBtn = screen.getAllByRole('button', { name: /\+ Cargar Nueva Deuda/i })[0];
+    const addDebtBtn = screen.getAllByRole('button', { name: /Cargar Nueva Deuda/i })[0];
     const user = userEvent.setup();
     await user.click(addDebtBtn);
     expect(handleAddDebt).toHaveBeenCalled();
@@ -148,7 +148,7 @@ describe('DebtView Component Characterization', () => {
     const handleAddDebt = vi.fn();
     render(<DebtView {...defaultProps} onAddDebtClient={handleAddDebt} />);
 
-    const headerAddDebtBtn = screen.getByRole('button', { name: /\+ Cargar Nueva Deuda/i });
+    const headerAddDebtBtn = screen.getByRole('button', { name: /Cargar Nueva Deuda/i });
     await user.click(headerAddDebtBtn);
     expect(handleAddDebt).toHaveBeenCalledWith(null);
   });

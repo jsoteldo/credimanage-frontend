@@ -49,7 +49,7 @@ describe('ClientsTable Component', () => {
     const emptyMessages = screen.getAllByText('No hay clientes registrados todavía.');
     expect(emptyMessages.length).toBeGreaterThanOrEqual(1);
 
-    const newClientBtns = screen.getAllByRole('button', { name: /\+ Nuevo Cliente/i });
+    const newClientBtns = screen.getAllByRole('button', { name: /Nuevo Cliente/i });
     expect(newClientBtns.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -116,7 +116,7 @@ describe('ClientsTable Component', () => {
 
     render(<ClientsTable {...defaultProps} onNewClient={handleNewClient} />);
 
-    const newClientBtn = screen.getByRole('button', { name: /\+ Nuevo Cliente/i });
+    const newClientBtn = screen.getByRole('button', { name: /Nuevo Cliente/i });
     await user.click(newClientBtn);
     expect(handleNewClient).toHaveBeenCalled();
   });

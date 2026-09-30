@@ -14,6 +14,7 @@ import {
   ImportProductsResult,
   Permission,
   Role,
+  WhatsAppReminderConfig,
 } from '../types';
 
 const TOKEN_KEY = 'credimanage_pos_token';
@@ -499,4 +500,19 @@ export const api = {
       body: JSON.stringify({ permissions }),
     }),
   getAllPermissions: () => request<Permission[]>('/api/permissions'),
+
+  // Settings - WhatsApp Collection Reminder Template
+  getWhatsAppReminderConfig: () =>
+    request<WhatsAppReminderConfig>('/api/settings/whatsapp-collection-reminder'),
+
+  updateWhatsAppReminderConfig: (template: string) =>
+    request<WhatsAppReminderConfig>('/api/settings/whatsapp-collection-reminder', {
+      method: 'PUT',
+      body: JSON.stringify({ template }),
+    }),
+
+  resetWhatsAppReminderConfig: () =>
+    request<WhatsAppReminderConfig>('/api/settings/whatsapp-collection-reminder/reset', {
+      method: 'POST',
+    }),
 };

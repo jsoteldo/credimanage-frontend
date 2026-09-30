@@ -14,6 +14,7 @@ export interface ClientSelectorProps {
   placeholder?: string;
   disabled?: boolean;
   onClientCreated?: (newClient: Client) => void;
+  maxVisibleItems?: number;
 }
 
 export const ClientSelector: React.FC<ClientSelectorProps> = ({
@@ -26,6 +27,7 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
   placeholder = 'Buscar cliente por nombre, código o teléfono...',
   disabled = false,
   onClientCreated,
+  maxVisibleItems,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -34,6 +36,16 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Automatically scroll highlighted option into view if outside visible scroll area (Req 14)
+  useEffect(() => {
+    if (highlightedIndex >= 0 && optionRefs.current[highlightedIndex]) {
+      optionRefs.current[highlightedIndex]?.scrollIntoView?.({
+        block: 'nearest',
+      });
+    }
+  }, [highlightedIndex]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -157,6 +169,19 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
     mode === 'bank'
       ? 'Puedes seleccionar cualquier cliente activo, tenga o no créditos previos.'
       : 'Puedes seleccionar cualquier cliente activo, tenga o no deuda pendiente.';
+
+  const listboxMaxHeightClass = useMemo(() => {
+    if (maxVisibleItems === 3) return 'max-h-[210px]';
+    if (maxVisibleItems) return '';
+    return 'max-h-60';
+  }, [maxVisibleItems]);
+
+  const listboxStyle = useMemo(() => {
+    if (maxVisibleItems && maxVisibleItems !== 3) {
+      return { maxHeight: `${maxVisibleItems * 70}px` };
+    }
+    return undefined;
+  }, [maxVisibleItems]);
 
   return (
     <div className="space-y-1.5" ref={containerRef}>
@@ -345,7 +370,9 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
             <div
               role="listbox"
               aria-label="Resultados de clientes"
-              className="absolute left-0 right-0 top-full mt-1 z-30 max-h-60 overflow-y-auto divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 shadow-xl"
+              data-max-visible-items={maxVisibleItems}
+              style={listboxStyle}
+              className={`absolute left-0 right-0 top-full mt-1 z-40 ${listboxMaxHeightClass} overflow-y-auto overflow-x-hidden custom-scrollbar divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 shadow-xl`}
             >
               {filteredClients.length === 0 ? (
                 <div className="p-4 text-center text-xs space-y-2.5">
@@ -373,11 +400,14 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
                   return (
                     <div
                       key={c.id}
+                      ref={(el) => {
+                        optionRefs.current[idx] = el;
+                      }}
                       role="option"
                       aria-selected={idx === highlightedIndex}
                       onClick={() => handleSelect(c)}
                       onMouseEnter={() => setHighlightedIndex(idx)}
-                      className={`p-3 px-3.5 flex items-center justify-between text-left transition-colors cursor-pointer ${
+                      className={`p-3 pl-3.5 pr-4 flex items-center justify-between text-left transition-colors cursor-pointer ${
                         idx === highlightedIndex ? 'bg-slate-100' : 'hover:bg-slate-50'
                       }`}
                     >

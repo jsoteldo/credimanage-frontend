@@ -10,6 +10,7 @@ interface SidebarProps {
   onExportData: () => void;
   onOpenLogin: () => void;
   onOpenImportModal?: () => void;
+  onOpenMessagesConfig?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   isMobileOpen?: boolean;
@@ -17,7 +18,7 @@ interface SidebarProps {
 }
 
 interface NavItemDef {
-  id: CurrentView | 'import-modal';
+  id: CurrentView | 'import-modal' | 'messages-config';
   label: string;
   icon: string;
   adminOnly?: boolean;
@@ -38,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onExportData,
   onOpenLogin,
   onOpenImportModal,
+  onOpenMessagesConfig,
   isCollapsed = false,
   onToggleCollapse,
   isMobileOpen = false,
@@ -46,6 +48,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleNavClick = (item: NavItemDef) => {
     if (item.id === 'import-modal') {
       if (onOpenImportModal) onOpenImportModal();
+    } else if (item.id === 'messages-config') {
+      if (onOpenMessagesConfig) onOpenMessagesConfig();
     } else {
       setCurrentView(item.id as CurrentView);
     }
@@ -66,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      title: 'Productos',
+      title: 'Productos e Inventario',
       items: [
         { id: 'products', label: 'Productos', icon: 'inventory_2', permission: 'product.view' },
         { id: 'departments', label: 'Departamentos', icon: 'category', permission: 'department.view' },
@@ -80,6 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'locations', label: 'Tiendas / Almacenes', icon: 'store', permission: 'location.view' },
         { id: 'admin', label: 'Administración', icon: 'admin_panel_settings', adminOnly: true },
+        { id: 'messages-config', label: 'Recordatorio WhatsApp', icon: 'chat', adminOnly: true, isAction: true },
       ],
     },
   ];

@@ -239,8 +239,8 @@ export const DebtView: React.FC<DebtViewProps> = ({
             className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
             title="Cargar una nueva deuda o consumo a cualquier cliente registrado, tenga o no deuda actual"
           >
-            <span className="material-symbols-outlined text-[20px]">post_add</span>
-            <span>+ Cargar Nueva Deuda</span>
+            <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
+            <span>Cargar Nueva Deuda</span>
           </button>
         }
       />
@@ -380,8 +380,8 @@ export const DebtView: React.FC<DebtViewProps> = ({
                     onClick={() => onAddDebtClient(null)}
                     className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
                   >
-                    <span className="material-symbols-outlined text-[16px]">post_add</span>
-                    <span>+ Cargar Nueva Deuda</span>
+                    <span className="material-symbols-outlined text-[16px]">shopping_bag</span>
+                    <span>Cargar Nueva Deuda</span>
                   </button>
                 </div>
               </div>
@@ -560,10 +560,10 @@ export const DebtView: React.FC<DebtViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Total Cargos y Compras (+)
+                Total Cargos y Compras
               </span>
               <div className="text-2xl font-black text-rose-600 font-mono tracking-tight">
-                +{formatCurrency(totalChargesPeriod)}
+                {formatCurrency(totalChargesPeriod)}
               </div>
               <p className="text-[11px] text-slate-500 mt-1 font-medium">
                 Compras a crédito y cargos registrados en el período
@@ -572,10 +572,10 @@ export const DebtView: React.FC<DebtViewProps> = ({
 
             <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Total Abonos Cobrados (-)
+                Total Abonos Cobrados
               </span>
               <div className="text-2xl font-black text-emerald-600 font-mono tracking-tight">
-                -{formatCurrency(totalPaymentsPeriod)}
+                {formatCurrency(totalPaymentsPeriod)}
               </div>
               <p className="text-[11px] text-slate-500 mt-1 font-medium">
                 Recaudación y cobranza aplicada a cuenta corriente
@@ -591,7 +591,7 @@ export const DebtView: React.FC<DebtViewProps> = ({
                   netBalancePeriod > 0 ? 'text-rose-600' : 'text-indigo-600'
                 }`}
               >
-                {netBalancePeriod >= 0 ? `+${formatCurrency(netBalancePeriod)}` : formatCurrency(netBalancePeriod)}
+                {formatCurrency(Math.abs(netBalancePeriod))}
               </div>
               <p className="text-[11px] text-slate-500 mt-1 font-medium">
                 Variación neta en la cartera de deuda corriente
@@ -654,8 +654,8 @@ export const DebtView: React.FC<DebtViewProps> = ({
                   className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 outline-none cursor-pointer"
                 >
                   <option value="all">Todos los Movimientos</option>
-                  <option value="charges">Solo Cargos / Compras (+)</option>
-                  <option value="payments">Solo Abonos (-)</option>
+                  <option value="charges">Solo Cargos / Compras</option>
+                  <option value="payments">Solo Abonos</option>
                 </select>
 
                 <div className="relative flex-1 md:w-56">

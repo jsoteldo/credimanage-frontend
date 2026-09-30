@@ -124,6 +124,16 @@ export default function App() {
   const [selectedLocationForEdit, setSelectedLocationForEdit] = useState<Location | null>(null);
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [adminInitialTab, setAdminInitialTab] = useState<
+    'audit' | 'users' | 'annulled' | 'portfolio' | 'pending_payments' | 'messages'
+  >('audit');
+
+  const handleOpenReminderConfig = () => {
+    setAdminInitialTab('messages');
+    setShowRemindersModal(false);
+    navigate('/admin');
+    setCurrentView('admin');
+  };
 
   // Alert Modal for Deletion / Deactivation Business Rules
   const [alertData, setAlertData] = useState<{
@@ -289,6 +299,11 @@ export default function App() {
 
   const handleReactivateDepartment = async (id: string) => {
     await api.reactivateDepartment(id);
+    await loadProductDomainData();
+  };
+
+  const handleDeleteDepartment = async (id: string) => {
+    await api.deleteDepartment(id);
     await loadProductDomainData();
   };
 
@@ -688,6 +703,7 @@ export default function App() {
         onExportData={handleExportDataCSV}
         onOpenLogin={() => setShowLoginModal(true)}
         onOpenImportModal={() => setShowImportProductsModal(true)}
+        onOpenMessagesConfig={handleOpenReminderConfig}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         isMobileOpen={mobileSidebarOpen}
@@ -807,6 +823,7 @@ export default function App() {
           {currentView === 'admin' && currentUser.role === 'Administrador' && (
             <AdminPanel
               currentUser={currentUser}
+              initialTab={adminInitialTab}
               onNavigateToClients={() => {
                 navigate('/clients');
                 setCurrentView('clients');
@@ -951,6 +968,10 @@ export default function App() {
         initialClient={selectedClientForEdit}
         onDeactivateClient={handleDeactivateClient}
         onReactivateClient={handleReactivateClient}
+        onOpenAddDebt={(client) => {
+          setShowClientFormModal(false);
+          handleOpenAddDebt(client);
+        }}
       />
 
       {/* Statement of Account Modal */}
@@ -998,6 +1019,7 @@ export default function App() {
         onPayClient={(c) => handleOpenPayment(c, false)}
         onAddDebtClient={handleOpenAddDebt}
         onViewStatement={handleOpenStatement}
+        onOpenReminderConfig={currentUser?.role === 'Administrador' ? handleOpenReminderConfig : undefined}
       />
 
       {/* JWT Login Modal */}
@@ -1103,6 +1125,8 @@ export default function App() {
         initialProduct={selectedProductForEdit}
         departments={departments}
         availableComponentProducts={products}
+        onDeactivateProduct={(p) => handleDeactivateProduct(p.id)}
+        onReactivateProduct={(p) => handleReactivateProduct(p.id)}
       />
 
       {/* Import Products Modal (Excel / CSV) */}
@@ -1120,6 +1144,9 @@ export default function App() {
         onClose={() => setShowDepartmentFormModal(false)}
         onSave={handleSaveDepartment}
         initialDepartment={selectedDepartmentForEdit}
+        onDeactivateDepartment={(d) => handleDeactivateDepartment(d.id)}
+        onReactivateDepartment={(d) => handleReactivateDepartment(d.id)}
+        onDeleteDepartment={(d) => handleDeleteDepartment(d.id)}
       />
 
       {/* Supplier Form Modal */}
@@ -1128,6 +1155,8 @@ export default function App() {
         onClose={() => setShowSupplierFormModal(false)}
         onSave={handleSaveSupplier}
         initialSupplier={selectedSupplierForEdit}
+        onDeactivateSupplier={(s) => handleDeactivateSupplier(s.id)}
+        onReactivateSupplier={(s) => handleReactivateSupplier(s.id)}
       />
 
       {/* Location Form Modal */}
@@ -1136,6 +1165,8 @@ export default function App() {
         onClose={() => setShowLocationFormModal(false)}
         onSave={handleSaveLocation}
         initialLocation={selectedLocationForEdit}
+        onDeactivateLocation={(l) => handleDeactivateLocation(l.id)}
+        onReactivateLocation={(l) => handleReactivateLocation(l.id)}
       />
 
       {/* Settings Modal */}

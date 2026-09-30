@@ -23,7 +23,7 @@ export interface KpiCardProps {
   subtitleColorClass?: string;
   isMono?: boolean;
   isActive?: boolean;
-  activeColor?: 'indigo' | 'rose';
+  activeColor?: 'indigo' | 'rose' | 'blue' | 'emerald' | 'purple';
   onClick?: () => void;
   titleTooltip?: string;
 }
@@ -45,17 +45,23 @@ export const KpiCard: React.FC<KpiCardProps> = ({
 }) => {
   const isClickable = !!onClick;
 
-  const activeBorderClass = isActive
-    ? activeColor === 'rose'
-      ? 'border-rose-500 ring-2 ring-rose-500/10'
-      : 'border-indigo-500 ring-2 ring-indigo-500/10'
-    : 'border-slate-200/80 hover:border-slate-300';
+  const activeStyles: Record<string, string> = {
+    rose: 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-50/20 shadow-xs',
+    blue: 'border-blue-500 ring-2 ring-blue-500/10 bg-blue-50/20 shadow-xs',
+    emerald: 'border-emerald-500 ring-2 ring-emerald-500/10 bg-emerald-50/20 shadow-xs',
+    purple: 'border-purple-500 ring-2 ring-purple-500/10 bg-purple-50/20 shadow-xs',
+    indigo: 'border-indigo-500 ring-2 ring-indigo-500/10 bg-indigo-50/20 shadow-xs',
+  };
+
+  const activeClass = isActive
+    ? (activeStyles[activeColor] || activeStyles.indigo)
+    : 'border-slate-200/80 hover:border-slate-300 hover:shadow-xs bg-white';
 
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-2xl border p-5 shadow-xs transition-all ${
-        isClickable ? `cursor-pointer ${activeBorderClass}` : 'border-slate-200/80'
+      className={`rounded-2xl border p-5 transition-all select-none ${
+        isClickable ? `cursor-pointer active:scale-[0.99] ${activeClass}` : 'border-slate-200/80 bg-white'
       }`}
       title={titleTooltip}
     >

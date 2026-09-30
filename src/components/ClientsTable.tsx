@@ -97,7 +97,7 @@ export const ClientsTable: React.FC<ClientsTableProps> = ({
                 title="Registrar un nuevo cliente en el sistema"
               >
                 <span className="material-symbols-outlined text-[20px]">person_add</span>
-                <span>+ Nuevo Cliente</span>
+                <span>Nuevo Cliente</span>
               </button>
             )}
           </>
@@ -231,7 +231,7 @@ export const ClientsTable: React.FC<ClientsTableProps> = ({
                           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
                         >
                           <span className="material-symbols-outlined text-[16px]">person_add</span>
-                          <span>+ Nuevo Cliente</span>
+                          <span>Nuevo Cliente</span>
                         </button>
                       </div>
                     )}
@@ -378,7 +378,7 @@ export const ClientsTable: React.FC<ClientsTableProps> = ({
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
                   >
                     <span className="material-symbols-outlined text-[16px]">person_add</span>
-                    <span>+ Nuevo Cliente</span>
+                    <span>Nuevo Cliente</span>
                   </button>
                 </div>
               )}

@@ -31,7 +31,7 @@ describe('ClientSelector Component', () => {
     expect(
       screen.getByPlaceholderText('Buscar cliente por nombre, código o teléfono...')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /\+ Nuevo Cliente/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Nuevo Cliente/i })).toBeInTheDocument();
   });
 
   it('renders bank mode label and helper text', () => {
@@ -131,7 +131,7 @@ describe('ClientSelector Component', () => {
 
     expect(screen.getByText(/No se encontraron clientes para:/i)).toBeInTheDocument();
     expect(screen.getByText('"Inexistente XYZ"')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /\+ Crear nuevo cliente/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Crear nuevo cliente/i })).toBeInTheDocument();
   });
 
   it('clears search text when clear button is clicked', async () => {
@@ -210,7 +210,7 @@ describe('ClientSelector Component', () => {
       />
     );
 
-    const newClientBtn = screen.getByRole('button', { name: /\+ Nuevo Cliente/i });
+    const newClientBtn = screen.getByRole('button', { name: /Nuevo Cliente/i });
     await user.click(newClientBtn);
 
     expect(screen.getByTestId('mock-client-form-modal')).toBeInTheDocument();

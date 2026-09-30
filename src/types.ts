@@ -334,3 +334,12 @@ export interface Role {
   isSystem: boolean;
   permissions?: { permission: Permission }[];
 }
+
+export interface WhatsAppReminderConfig {
+  key: string;
+  template: string;
+  isDefault: boolean;
+  allowedVariables: string[];
+  defaultTemplate: string;
+}
+

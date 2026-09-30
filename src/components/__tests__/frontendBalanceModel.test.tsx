@@ -693,7 +693,15 @@ describe('FASE 2B.2: Frontend Balance Model Adaptations', () => {
         client: { ...defaultClient, bankDebtBalance: 200, currentBalance: 200 },
       });
 
-      // Render App on reports route where BalanceReportView has direct Abonar action
+      vi.mocked(api.getStatementOfAccount).mockResolvedValue({
+        client: defaultClient,
+        availableCredit: 500,
+        purchases: [],
+        payments: [],
+        loans: [],
+      });
+
+      // Render App on reports route where BalanceReportView has clickable client rows opening Statement of Account
       window.history.pushState({}, '', '/reports');
       render(<App />);
 
@@ -701,9 +709,12 @@ describe('FASE 2B.2: Frontend Balance Model Adaptations', () => {
         expect(api.getBalanceReport).toHaveBeenCalled();
       });
 
-      // 1) Test Daily Debt payment call site
-      const abonarBtn = await screen.findAllByTitle('Abonar / Liquidar');
-      await user.click(abonarBtn[0]);
+      // 1) Test Daily Debt payment call site (clicking client row bar -> Statement modal -> Abonar Deuda Corriente)
+      const clientRow = await screen.findByText(defaultClient.name);
+      await user.click(clientRow);
+
+      const abonarBtn = await screen.findByRole('button', { name: /Abonar Deuda Corriente/i });
+      await user.click(abonarBtn);
 
       expect(await screen.findByRole('heading', { name: /Registrar Abono a Deuda Corriente/i })).toBeInTheDocument();
 

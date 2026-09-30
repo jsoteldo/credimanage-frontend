@@ -58,8 +58,8 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
                 onClick={onNewSupplier}
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[20px]">add</span>
-                <span>+ Nuevo Proveedor</span>
+                <span className="material-symbols-outlined text-[20px]">local_shipping</span>
+                <span>Nuevo Proveedor</span>
               </button>
             )}
           </>
@@ -100,19 +100,25 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
               <th className="py-3.5 px-4">Contacto / Teléfono</th>
               <th className="py-3.5 px-4">Correo</th>
               <th className="py-3.5 px-4 text-center">Estado</th>
-              <th className="py-3.5 px-4 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-slate-400">
+                <td colSpan={5} className="py-10 text-center text-slate-400">
                   No hay proveedores registrados.
                 </td>
               </tr>
             ) : (
               filtered.map((supp) => (
-                <tr key={supp.id} className="hover:bg-slate-50/80 transition-colors">
+                <tr
+                  key={supp.id}
+                  onClick={() => onEditSupplier(supp)}
+                  className={`hover:bg-slate-50/80 transition-colors cursor-pointer select-none ${
+                    !supp.active ? 'opacity-60 bg-slate-50/30' : ''
+                  }`}
+                  title="Clic para editar proveedor"
+                >
                   <td className="py-3 px-4">
                     <div className="font-bold text-slate-900">{supp.name}</div>
                     {supp.address && <div className="text-[11px] text-slate-400">{supp.address}</div>}
@@ -137,38 +143,6 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
                     >
                       {supp.active ? 'Activo' : 'Inactivo'}
                     </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      {allowManage && (
-                        <>
-                          <button
-                            onClick={() => onEditSupplier(supp)}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                            title="Editar proveedor"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                          </button>
-                          {supp.active ? (
-                            <button
-                              onClick={() => onDeactivateSupplier(supp)}
-                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Desactivar proveedor"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">block</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => onReactivateSupplier(supp)}
-                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                              title="Reactivar proveedor"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
                   </td>
                 </tr>
               ))

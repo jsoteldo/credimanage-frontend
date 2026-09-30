@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Client, PaymentPeriod, PaymentFrequency } from '../types';
 import {
   calculateLoanSchedule,
@@ -31,6 +32,7 @@ interface ClientFormModalProps {
   onDeactivateClient?: (client: Client) => void;
   onReactivateClient?: (client: Client) => void;
   zIndexClass?: string;
+  onOpenAddDebt?: (client: Client) => void;
 }
 
 export const ClientFormModal: React.FC<ClientFormModalProps> = ({
@@ -41,6 +43,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   onDeactivateClient,
   onReactivateClient,
   zIndexClass,
+  onOpenAddDebt,
 }) => {
   // Client base info
   const [name, setName] = useState('');
@@ -137,8 +140,6 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     });
   }, [creditCapital, interestRate, installmentsCount, frequency, firstDueDate]);
 
-  if (!isOpen) return null;
-
   const parsedCreditLimit = parseFloat(String(creditLimit)) || 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -224,7 +225,51 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     }
   };
 
-  return (
+  const isDirty = useMemo(() => {
+    if (!initialClient) return false;
+    return (
+      name.trim() !== (initialClient.name || '').trim() ||
+      clientNumber.trim() !== (initialClient.clientNumber || '').trim() ||
+      address.trim() !== (initialClient.address || '').trim() ||
+      phone.trim() !== (initialClient.phone || '').trim() ||
+      Number(creditLimit) !== Number(initialClient.creditLimit || 0) ||
+      paymentPeriod !== (initialClient.paymentPeriod || 'Mensual') ||
+      paymentDay.trim() !== (initialClient.paymentDay || '').trim() ||
+      nextDueDate.trim() !== (initialClient.nextDueDate || '').trim()
+    );
+  }, [
+    initialClient,
+    name,
+    clientNumber,
+    address,
+    phone,
+    creditLimit,
+    paymentPeriod,
+    paymentDay,
+    nextDueDate,
+  ]);
+
+  const handleAddDebtClick = () => {
+    if (!initialClient) return;
+
+    if (isDirty) {
+      const confirmLeave = window.confirm(
+        'Tiene modificaciones no guardadas en los datos del cliente. Si continúa para agregar deuda, los cambios no guardados se descartarán. ¿Desea continuar?'
+      );
+      if (!confirmLeave) {
+        return;
+      }
+    }
+
+    if (onOpenAddDebt) {
+      onOpenAddDebt(initialClient);
+    }
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  const modalContent = (
     <>
       <div className={`fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center ${zIndexClass || 'z-50'} p-4 overflow-y-auto`}>
         <div className="w-full max-w-2xl bg-white rounded-3xl border border-slate-200/80 shadow-2xl my-4 max-h-[92vh] flex flex-col overflow-hidden">
@@ -259,7 +304,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           )}
 
           {/* Form Content */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
+          <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
             {/* General Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Full Name */}
@@ -695,8 +740,28 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 )}
               </div>
 
-              {/* Right Actions: Cancelar and Guardar Cliente */}
-              <div className="flex items-center gap-2">
+              {/* Right Actions: Agregar Deuda, Cancelar and Guardar Cliente */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {initialClient && (
+                  <button
+                    type="button"
+                    onClick={handleAddDebtClick}
+                    disabled={loading || initialClient.status === 'Desactivado'}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs ${
+                      initialClient.status === 'Desactivado'
+                        ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                        : 'bg-white hover:bg-indigo-50/70 text-indigo-700 border border-indigo-200 cursor-pointer'
+                    }`}
+                    title={
+                      initialClient.status === 'Desactivado'
+                        ? 'No se puede cargar deuda a un cliente desactivado'
+                        : 'Cargar una nueva deuda o compra a este cliente'
+                    }
+                  >
+                    <span className="material-symbols-outlined text-[18px]">post_add</span>
+                    <span>+ Agregar Deuda</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onClose}
@@ -738,4 +803,9 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
       )}
     </>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };

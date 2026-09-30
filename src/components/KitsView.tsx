@@ -68,8 +68,8 @@ export const KitsView: React.FC<KitsViewProps> = ({
                 onClick={onNewKit}
                 className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[20px]">add</span>
-                <span>+ Nuevo Combo / Kit</span>
+                <span className="material-symbols-outlined text-[20px]">widgets</span>
+                <span>Nuevo Combo / Kit</span>
               </button>
             )}
           </>
@@ -123,7 +123,7 @@ export const KitsView: React.FC<KitsViewProps> = ({
           <span className="material-symbols-outlined text-[36px] text-slate-300">widgets</span>
           <p className="font-semibold text-slate-600 mt-2">No hay kits registrados</p>
           <p className="text-xs text-slate-400">
-            Haz clic en "+ Nuevo Combo / Kit" para registrar un producto compuesto.
+            Haz clic en "Nuevo Combo / Kit" para registrar un producto compuesto.
           </p>
         </div>
       ) : (

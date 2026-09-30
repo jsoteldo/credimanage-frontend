@@ -6,6 +6,8 @@ interface LocationFormModalProps {
   onClose: () => void;
   onSave: (data: any) => Promise<void>;
   initialLocation?: Location | null;
+  onDeactivateLocation?: (location: Location) => Promise<void>;
+  onReactivateLocation?: (location: Location) => Promise<void>;
   zIndexClass?: string;
 }
 
@@ -14,6 +16,8 @@ export const LocationFormModal: React.FC<LocationFormModalProps> = ({
   onClose,
   onSave,
   initialLocation,
+  onDeactivateLocation,
+  onReactivateLocation,
   zIndexClass = 'z-50',
 }) => {
   const [name, setName] = useState('');
@@ -66,7 +70,7 @@ export const LocationFormModal: React.FC<LocationFormModalProps> = ({
 
   return (
     <div className={`fixed inset-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm ${zIndexClass}`}>
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 flex flex-col animate-in fade-in zoom-in-95 duration-200">
         <div className="p-6 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
@@ -167,24 +171,81 @@ export const LocationFormModal: React.FC<LocationFormModalProps> = ({
             />
           </div>
 
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {loading ? 'hourglass_top' : 'save'}
-              </span>
-              <span>{loading ? 'Guardando...' : initialLocation ? 'Actualizar' : 'Crear'}</span>
-            </button>
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+            {/* Left Action: Desactivar / Reactivar Ubicación */}
+            <div className="shrink-0">
+              {initialLocation && (
+                initialLocation.active ? (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={async () => {
+                      if (onDeactivateLocation) {
+                        try {
+                          setLoading(true);
+                          await onDeactivateLocation(initialLocation);
+                          onClose();
+                        } catch (err: any) {
+                          setError(err.message || 'Error al desactivar la ubicación');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }
+                    }}
+                    className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Desactivar esta ubicación"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">block</span>
+                    <span>Desactivar Ubicación</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={async () => {
+                      if (onReactivateLocation) {
+                        try {
+                          setLoading(true);
+                          await onReactivateLocation(initialLocation);
+                          onClose();
+                        } catch (err: any) {
+                          setError(err.message || 'Error al reactivar la ubicación');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }
+                    }}
+                    className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Reactivar esta ubicación"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    <span>Reactivar Ubicación</span>
+                  </button>
+                )
+              )}
+            </div>
+
+            {/* Right Actions: Cancelar and Actualizar / Crear */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {loading ? 'hourglass_top' : 'save'}
+                </span>
+                <span>{loading ? 'Guardando...' : initialLocation ? 'Actualizar' : 'Crear'}</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

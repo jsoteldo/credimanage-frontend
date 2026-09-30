@@ -11,8 +11,8 @@ interface ProductsViewProps {
   currentUser: User | null;
   onNewProduct: () => void;
   onEditProduct: (product: Product) => void;
-  onDeactivateProduct: (product: Product) => Promise<void>;
-  onReactivateProduct: (product: Product) => Promise<void>;
+  onDeactivateProduct?: (product: Product) => Promise<void>;
+  onReactivateProduct?: (product: Product) => Promise<void>;
   onOpenImportModal: () => void;
   onRefreshData: () => void;
 }
@@ -115,8 +115,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
                 title="Registrar nuevo producto en el catálogo"
               >
-                <span className="material-symbols-outlined text-[20px]">add</span>
-                <span>+ Nuevo Producto</span>
+                <span className="material-symbols-outlined text-[20px]">inventory_2</span>
+                <span>Nuevo Producto</span>
               </button>
             )}
           </>
@@ -132,6 +132,10 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           icon="inventory_2"
           iconBgClass="bg-indigo-50"
           iconColorClass="text-indigo-600"
+          isActive={statusFilter === 'todos'}
+          activeColor="indigo"
+          onClick={() => setStatusFilter('todos')}
+          titleTooltip="Mostrar todos los productos registrados"
         />
         <KpiCard
           title="Venta Unitaria"
@@ -140,6 +144,10 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           icon="shopping_bag"
           iconBgClass="bg-blue-50"
           iconColorClass="text-blue-600"
+          isActive={statusFilter === 'unit'}
+          activeColor="blue"
+          onClick={() => setStatusFilter('unit')}
+          titleTooltip="Filtrar por productos de venta unitaria"
         />
         <KpiCard
           title="A Granel / Peso"
@@ -148,6 +156,10 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           icon="scale"
           iconBgClass="bg-emerald-50"
           iconColorClass="text-emerald-600"
+          isActive={statusFilter === 'weight'}
+          activeColor="emerald"
+          onClick={() => setStatusFilter('weight')}
+          titleTooltip="Filtrar por productos a granel o peso"
         />
         <KpiCard
           title="Kits / Combos"
@@ -156,6 +168,10 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           icon="widgets"
           iconBgClass="bg-purple-50"
           iconColorClass="text-purple-600"
+          isActive={statusFilter === 'kit'}
+          activeColor="purple"
+          onClick={() => setStatusFilter('kit')}
+          titleTooltip="Filtrar por kits y combos compuestos"
         />
       </KpiGrid>
 
@@ -220,27 +236,33 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
               <th className="py-3.5 px-4 text-right">P. Venta</th>
               <th className="py-3.5 px-4 text-center">Inv.</th>
               <th className="py-3.5 px-4 text-center">Estado</th>
-              <th className="py-3.5 px-4 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
             {displayedProducts.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-slate-400">
+                <td colSpan={8} className="py-12 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <span className="material-symbols-outlined text-[36px] text-slate-300">
                       inventory_2
                     </span>
                     <p className="font-semibold text-slate-600">No se encontraron productos</p>
                     <p className="text-[11px] text-slate-400">
-                      Ajusta los filtros o haz clic en "+ Nuevo Producto" para registrar uno.
+                      Ajusta los filtros o haz clic en "Nuevo Producto" para registrar uno.
                     </p>
                   </div>
                 </td>
               </tr>
             ) : (
               displayedProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-slate-50/80 transition-colors">
+                <tr
+                  key={product.id}
+                  onClick={() => allowEdit && onEditProduct(product)}
+                  className={`hover:bg-slate-50/80 transition-colors select-none ${
+                    allowEdit ? 'cursor-pointer' : ''
+                  } ${!product.active ? 'opacity-60 bg-slate-50/30' : ''}`}
+                  title={allowEdit ? 'Editar producto' : undefined}
+                >
                   <td className="py-3 px-4 font-mono font-bold text-slate-900">
                     <div>{product.sku}</div>
                     {product.barcode && (
@@ -269,17 +291,17 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                   </td>
                   <td className="py-3 px-4">
                     {product.saleType === 'KIT' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
                         <span className="material-symbols-outlined text-[12px]">widgets</span>
                         <span>KIT</span>
                       </span>
                     ) : product.saleType === 'WEIGHT' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
                         <span className="material-symbols-outlined text-[12px]">scale</span>
                         <span>PESO</span>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
                         <span>UNIDAD</span>
                       </span>
                     )}
@@ -313,38 +335,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       {product.active ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      {allowEdit && (
-                        <button
-                          onClick={() => onEditProduct(product)}
-                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                          title="Editar producto"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">edit</span>
-                        </button>
-                      )}
-                      {allowDeactivate && (
-                        product.active ? (
-                          <button
-                            onClick={() => onDeactivateProduct(product)}
-                            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Desactivar producto"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">block</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => onReactivateProduct(product)}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                            title="Reactivar producto"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </td>
                 </tr>
               ))
             )}
@@ -362,7 +352,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           displayedProducts.map((product) => (
             <div
               key={product.id}
-              className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3"
+              onClick={() => allowEdit && onEditProduct(product)}
+              className={`bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3 ${
+                allowEdit ? 'cursor-pointer hover:bg-slate-50/90 active:bg-slate-100 select-none' : ''
+              } ${!product.active ? 'opacity-60 bg-slate-50/30' : ''}`}
+              title={allowEdit ? 'Toca para editar producto' : undefined}
             >
               <div className="flex justify-between items-start gap-2">
                 <div>
@@ -394,33 +388,17 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                <span className="text-slate-500 font-medium">
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500 font-medium">
+                <span>
                   {product.departmentName || 'General'} • {product.saleType}
                 </span>
 
-                <div className="flex items-center gap-1">
-                  {allowEdit && (
-                    <button
-                      onClick={() => onEditProduct(product)}
-                      className="px-2.5 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg"
-                    >
-                      Editar
-                    </button>
-                  )}
-                  {allowDeactivate && (
-                    <button
-                      onClick={() =>
-                        product.active ? onDeactivateProduct(product) : onReactivateProduct(product)
-                      }
-                      className={`px-2 py-1 text-xs font-bold rounded-lg ${
-                        product.active ? 'text-rose-500 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'
-                      }`}
-                    >
-                      {product.active ? 'Desactivar' : 'Activar'}
-                    </button>
-                  )}
-                </div>
+                {allowEdit && (
+                  <span className="text-[11px] text-indigo-600 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">edit</span>
+                    <span>Editar</span>
+                  </span>
+                )}
               </div>
             </div>
           ))

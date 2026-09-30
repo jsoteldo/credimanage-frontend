@@ -137,11 +137,6 @@ export const GrantLoanModal: React.FC<GrantLoanModalProps> = ({
 
   if (!isOpen) return null;
 
-  const clientBalance = selectedClient?.currentBalance || 0;
-  const clientLimit = selectedClient?.creditLimit || 0;
-  const projectedBalance = clientBalance + loanCalculation.totalAmount;
-  const isOverLimit = clientLimit > 0 && projectedBalance > clientLimit;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmittingRef.current) return;
@@ -164,17 +159,6 @@ export const GrantLoanModal: React.FC<GrantLoanModalProps> = ({
 
     if (numInstallments < 1) {
       setError('El número de cuotas debe ser al menos 1');
-      return;
-    }
-
-    if (isOverLimit) {
-      setError(
-        `El crédito supera el límite de crédito disponible del cliente (Límite: S/ ${clientLimit.toFixed(
-          2
-        )}, Total a pagar: S/ ${loanCalculation.totalAmount.toFixed(2)}, Saldo proyectado: S/ ${projectedBalance.toFixed(
-          2
-        )}).`
-      );
       return;
     }
 
@@ -242,7 +226,7 @@ export const GrantLoanModal: React.FC<GrantLoanModalProps> = ({
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
             {/* Reusable Client Selector in Bank Mode */}
             <ClientSelector
               selectedClient={selectedClient}
@@ -400,20 +384,6 @@ export const GrantLoanModal: React.FC<GrantLoanModalProps> = ({
                 <span className="material-symbols-outlined text-[16px]">calendar_month</span>
                 <span>Previsualizar Cronograma ({loanCalculation.installmentsCount} cuotas {loanCalculation.frequency})</span>
               </button>
-
-              {/* Credit Limit warning if exceeded */}
-              {clientLimit > 0 && (
-                <div
-                  className={`pt-2 border-t border-indigo-100 flex justify-between items-center text-[11px] font-semibold ${
-                    isOverLimit ? 'text-rose-600' : 'text-slate-600'
-                  }`}
-                >
-                  <span>Límite disponible: {formatCurrency(clientLimit)}</span>
-                  <span>
-                    Saldo proyectado: {formatCurrency(projectedBalance)} {isOverLimit && '⚠️ (Excedido)'}
-                  </span>
-                </div>
-              )}
             </div>
 
             {/* Ticket & Concept Details */}
@@ -471,7 +441,7 @@ export const GrantLoanModal: React.FC<GrantLoanModalProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={loading || !selectedClient || isOverLimit || numCapital <= 0}
+                disabled={loading || !selectedClient || numCapital <= 0}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">done</span>
