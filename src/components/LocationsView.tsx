@@ -8,10 +8,11 @@ interface LocationsViewProps {
   locations: Location[];
   currentUser: User | null;
   onNewLocation: () => void;
-  onEditLocation: (loc: Location) => void;
+  onEditLocation: (loc: Location, initialTab?: 'details' | 'registers') => void;
   onDeactivateLocation: (loc: Location) => Promise<void>;
   onReactivateLocation: (loc: Location) => Promise<void>;
   onRefreshData: () => void;
+  onOpenStoreRegisters?: (loc: Location) => void;
 }
 
 export const LocationsView: React.FC<LocationsViewProps> = ({
@@ -22,6 +23,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
   onDeactivateLocation,
   onReactivateLocation,
   onRefreshData,
+  onOpenStoreRegisters,
 }) => {
   const [filterType, setFilterType] = useState<'all' | 'STORE' | 'WAREHOUSE'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,13 +48,22 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
     return true;
   });
 
+  const handleOpenRegisters = (loc: Location, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onOpenStoreRegisters) {
+      onOpenStoreRegisters(loc);
+    } else {
+      onEditLocation(loc, 'registers');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         icon="store"
         iconBgClass="bg-indigo-600"
         title="Tiendas y Almacenes"
-        subtitle="Configuración de puntos de venta y depósitos físicos de la empresa."
+        subtitle="Configuración de puntos de venta, depósitos físicos y cajas registradoras."
         actions={
           <>
             <button
@@ -157,13 +168,26 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                     {loc.address || <span className="text-slate-300">Sin dirección especificada</span>}
                   </td>
                   <td className="py-3.5 px-4 text-center">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        loc.active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                      }`}
-                    >
-                      {loc.active ? 'Activo' : 'Inactivo'}
-                    </span>
+                    <div className="flex items-center justify-center gap-2">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          loc.active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
+                        {loc.active ? 'Activo' : 'Inactivo'}
+                      </span>
+                      {loc.type === 'STORE' && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenRegisters(loc, e)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/60 transition-colors shadow-2xs cursor-pointer"
+                          title="Gestionar cajas"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">point_of_sale</span>
+                          <span>Cajas</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -174,3 +198,4 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
     </div>
   );
 };
+

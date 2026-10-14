@@ -55,14 +55,6 @@ export const KitsView: React.FC<KitsViewProps> = ({
         subtitle="Combos y paquetes armados con múltiples productos unitarios o por peso."
         actions={
           <>
-            <button
-              onClick={onRefreshData}
-              className="p-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-2xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-              title="Recargar combos"
-            >
-              <span className="material-symbols-outlined text-[18px]">refresh</span>
-            </button>
-
             {allowCreate && (
               <button
                 onClick={onNewKit}

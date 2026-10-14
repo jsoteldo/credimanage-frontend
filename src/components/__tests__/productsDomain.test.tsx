@@ -501,7 +501,7 @@ describe('Entrega 1: Products & Inventory Base Domain (Frontend Tests)', () => {
       const quantityInputs = screen.getAllByPlaceholderText('1');
       expect(quantityInputs.length).toBe(6);
       await user.clear(quantityInputs[0]);
-      await user.type(quantityInputs[0], '3.5');
+      await user.type(quantityInputs[0], '3');
 
       // D. Remove a component
       const deleteButtons = screen.getAllByTitle('Eliminar componente');
@@ -535,7 +535,7 @@ describe('Entrega 1: Products & Inventory Base Domain (Frontend Tests)', () => {
             components: expect.arrayContaining([
               expect.objectContaining({
                 componentProductId: 'comp-prod-1',
-                quantity: 3.5,
+                quantity: 3,
               }),
             ]),
           })
@@ -603,8 +603,8 @@ describe('Entrega 1: Products & Inventory Base Domain (Frontend Tests)', () => {
       );
 
       expect(screen.getByText('Departamentos de Productos')).toBeDefined();
-      expect(screen.getByText('Bebidas')).toBeDefined();
-      expect(screen.getByText('Lácteos')).toBeDefined();
+      expect(screen.getAllByText('Bebidas').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Lácteos').length).toBeGreaterThanOrEqual(1);
 
       const editBtns = screen.getAllByTitle('Editar departamento');
       await user.click(editBtns[0]);

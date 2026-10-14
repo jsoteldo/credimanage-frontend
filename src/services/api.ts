@@ -15,6 +15,19 @@ import {
   Permission,
   Role,
   WhatsAppReminderConfig,
+  InventoryStockItem,
+  InventoryMovement,
+  InventoryKpis,
+  ProductStockDetail,
+  Sale,
+  SaleSummaryItem,
+  CreateSalePayload,
+  CashRegister,
+  CashSession,
+  CashSessionSummary,
+  CashMovement,
+  Receipt,
+  ReceiptConfig,
 } from '../types';
 
 const TOKEN_KEY = 'credimanage_pos_token';
@@ -49,7 +62,20 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.error || 'Ocurrió un error en la solicitud');
+    let errorMsg = data.message || data.error || 'Ocurrió un error en la solicitud';
+    if (Array.isArray(errorMsg)) {
+      errorMsg = errorMsg.join(', ');
+    }
+    // Prevent raw HTTP exception messages if generic
+    if (res.status === 401 && (errorMsg === 'Unauthorized' || !errorMsg)) {
+      errorMsg = 'Sesión expirada o no autenticado. Por favor inicie sesión nuevamente.';
+    } else if (res.status === 403 && (errorMsg === 'Forbidden' || !errorMsg)) {
+      errorMsg = 'No tienes permiso para realizar esta operación.';
+    }
+    const err = new Error(errorMsg) as Error & { status?: number; statusCode?: number };
+    err.status = res.status;
+    err.statusCode = res.status;
+    throw err;
   }
 
   return data as T;
@@ -513,6 +539,384 @@ export const api = {
 
   resetWhatsAppReminderConfig: () =>
     request<WhatsAppReminderConfig>('/api/settings/whatsapp-collection-reminder/reset', {
+      method: 'POST',
+    }),
+
+  // =========================================================================
+  // MÓDULO INVENTARIO MULTI-TIENDA / MULTI-ALMACÉN - ETAPA 1
+  // =========================================================================
+  getInventoryStock: (params?: {
+    locationId?: string;
+    departmentId?: string;
+    q?: string;
+    stockState?: string;
+  }) => {
+    const urlParams = new URLSearchParams();
+    if (params?.locationId) urlParams.append('locationId', params.locationId);
+    if (params?.departmentId && params.departmentId !== 'todos')
+      urlParams.append('departmentId', params.departmentId);
+    if (params?.q) urlParams.append('q', params.q);
+    if (params?.stockState && params.stockState !== 'all')
+      urlParams.append('stockState', params.stockState);
+    return request<InventoryStockItem[]>(`/api/inventory/stock?${urlParams.toString()}`);
+  },
+
+  getInventoryKpis: (locationId?: string) => {
+    const urlParams = new URLSearchParams();
+    if (locationId) urlParams.append('locationId', locationId);
+    return request<InventoryKpis>(`/api/inventory/kpis?${urlParams.toString()}`);
+  },
+
+  getInventoryMovements: (params?: {
+    locationId?: string;
+    productId?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const urlParams = new URLSearchParams();
+    if (params?.locationId && params.locationId !== 'all')
+      urlParams.append('locationId', params.locationId);
+    if (params?.productId) urlParams.append('productId', params.productId);
+    if (params?.type && params.type !== 'all') urlParams.append('type', params.type);
+    if (params?.startDate) urlParams.append('startDate', params.startDate);
+    if (params?.endDate) urlParams.append('endDate', params.endDate);
+    if (params?.page) urlParams.append('page', String(params.page));
+    if (params?.limit) urlParams.append('limit', String(params.limit));
+    return request<{
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      movements: InventoryMovement[];
+    }>(`/api/inventory/movements?${urlParams.toString()}`);
+  },
+
+  getProductStockDetails: (productId: string) =>
+    request<ProductStockDetail>(`/api/inventory/product/${productId}`),
+
+  addInventory: (data: {
+    locationId: string;
+    productId: string;
+    quantity: number;
+    notes?: string;
+  }) =>
+    request<{
+      success: boolean;
+      productId: string;
+      productName: string;
+      locationId: string;
+      locationName: string;
+      previousStock: number;
+      quantityAdded: number;
+      newStock: number;
+      state: string;
+      movementId: string;
+    }>('/api/inventory/entry', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  adjustInventory: (data: {
+    locationId: string;
+    productId: string;
+    adjustmentQuantity: number;
+    reason: string;
+    notes?: string;
+  }) =>
+    request<{
+      success: boolean;
+      productId: string;
+      productName: string;
+      locationId: string;
+      locationName: string;
+      previousStock: number;
+      adjustmentQuantity: number;
+      newStock: number;
+      state: string;
+      movementId: string;
+    }>('/api/inventory/adjust', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  transferInventory: (data: {
+    fromLocationId: string;
+    toLocationId: string;
+    productId: string;
+    quantity: number;
+    notes?: string;
+  }) =>
+    request<{
+      success: boolean;
+      referenceId: string;
+      productId: string;
+      productName: string;
+      quantityTransferred: number;
+      fromLocation: {
+        id: string;
+        name: string;
+        previousStock: number;
+        newStock: number;
+        state: string;
+      };
+      toLocation: {
+        id: string;
+        name: string;
+        previousStock: number;
+        newStock: number;
+        state: string;
+      };
+    }>('/api/inventory/transfer', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  setMinimumStock: (data: {
+    locationId: string;
+    productId: string;
+    minimumStock: number;
+  }) =>
+    request<{
+      success: boolean;
+      productId: string;
+      locationId: string;
+      minimumStock: number;
+      currentQuantity: number;
+      state: string;
+    }>('/api/inventory/minimum-stock', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  explodeKitComponents: (kitProductId: string, quantity = 1) =>
+    request<
+      {
+        componentProductId: string;
+        sku: string;
+        name: string;
+        quantityPerKit: number;
+        totalQuantityDeduction: number;
+      }[]
+    >(`/api/inventory/kit/${kitProductId}/explode?quantity=${quantity}`),
+
+  // =========================================================================
+  // MÓDULO VENTAS / POS (ETAPA 2)
+  // =========================================================================
+  getSales: (params?: {
+    storeId?: string;
+    clientId?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    q?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const urlParams = new URLSearchParams();
+    if (params?.storeId && params.storeId !== 'all') urlParams.append('storeId', params.storeId);
+    if (params?.clientId && params.clientId !== 'all') urlParams.append('clientId', params.clientId);
+    if (params?.status && params.status !== 'all' && params.status !== 'todos')
+      urlParams.append('status', params.status);
+    if (params?.startDate) urlParams.append('startDate', params.startDate);
+    if (params?.endDate) urlParams.append('endDate', params.endDate);
+    if (params?.q) urlParams.append('q', params.q);
+    if (params?.limit) urlParams.append('limit', String(params.limit));
+    if (params?.offset) urlParams.append('offset', String(params.offset));
+    return request<{
+      total: number;
+      limit: number;
+      offset: number;
+      sales: SaleSummaryItem[];
+    }>(`/api/sales?${urlParams.toString()}`);
+  },
+
+  getSaleById: (id: string) => request<Sale>(`/api/sales/${id}`),
+
+  createSale: (payload: CreateSalePayload) =>
+    request<Sale>('/api/sales', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateSale: (id: string, payload: CreateSalePayload) =>
+    request<Sale>(`/api/sales/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  annulSale: (id: string, reason: string) =>
+    request<Sale>(`/api/sales/${id}/annul`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  // =========================================================================
+  // MÓDULO CAJA, TURNOS, MOVIMIENTOS Y BOLETA SIMPLE (ETAPA 3)
+  // =========================================================================
+  getCashRegisters: (storeId?: string) =>
+    request<CashRegister[]>(
+      storeId && storeId !== 'all'
+        ? `/api/cash/registers?storeId=${storeId}`
+        : '/api/cash/registers',
+    ),
+
+  createCashRegister: (data: {
+    storeId: string;
+    code: string;
+    name: string;
+    status?: 'ACTIVE' | 'INACTIVE';
+  }) =>
+    request<CashRegister>('/api/cash/registers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCashRegister: (
+    id: string,
+    data: { code?: string; name?: string; status?: 'ACTIVE' | 'INACTIVE' },
+  ) =>
+    request<CashRegister>(`/api/cash/registers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  updateCashRegisterStatus: (
+    id: string,
+    status: 'ACTIVE' | 'INACTIVE',
+  ) =>
+    request<CashRegister>(`/api/cash/registers/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+
+  getCurrentCashSession: (storeId?: string) =>
+    request<CashSession | null>(
+      storeId && storeId !== 'all'
+        ? `/api/cash/sessions/current?storeId=${storeId}`
+        : '/api/cash/sessions/current',
+    ),
+
+  openCashSession: (data: {
+    cashRegisterId: string;
+    storeId: string;
+    openingCashAmount: number;
+    notes?: string;
+  }) =>
+    request<CashSession>('/api/cash/sessions/open', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  closeCashSession: (
+    sessionId: string,
+    data: { countedCashAmount: number; notes?: string },
+  ) =>
+    request<CashSession>(`/api/cash/sessions/${sessionId}/close`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getCashSessionSummary: (sessionId: string) =>
+    request<CashSessionSummary>(`/api/cash/sessions/${sessionId}/summary`),
+
+  getCashSessionById: (sessionId: string) =>
+    request<CashSession>(`/api/cash/sessions/${sessionId}`),
+
+  getCashSessionsHistory: (params?: {
+    storeId?: string;
+    cashRegisterId?: string;
+    userId?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const urlParams = new URLSearchParams();
+    if (params?.storeId && params.storeId !== 'all') urlParams.append('storeId', params.storeId);
+    if (params?.cashRegisterId && params.cashRegisterId !== 'all')
+      urlParams.append('cashRegisterId', params.cashRegisterId);
+    if (params?.userId && params.userId !== 'all') urlParams.append('userId', params.userId);
+    if (params?.status && params.status !== 'all') urlParams.append('status', params.status);
+    if (params?.startDate) urlParams.append('startDate', params.startDate);
+    if (params?.endDate) urlParams.append('endDate', params.endDate);
+    if (params?.page) urlParams.append('page', String(params.page));
+    if (params?.limit) urlParams.append('limit', String(params.limit));
+    return request<{
+      items: CashSession[];
+      pagination: { total: number; page: number; limit: number; totalPages: number };
+    }>(`/api/cash/sessions?${urlParams.toString()}`);
+  },
+
+  addCashMovement: (
+    sessionId: string,
+    data: {
+      type: 'CASH_IN' | 'CASH_OUT';
+      amount: number;
+      reason: string;
+      notes?: string;
+    },
+  ) =>
+    request<{
+      movement: CashMovement;
+      summary: CashSessionSummary;
+      warning?: string | null;
+    }>(`/api/cash/sessions/${sessionId}/movements`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getCashMovements: (params?: {
+    cashSessionId?: string;
+    storeId?: string;
+    type?: string;
+    paymentMethod?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const urlParams = new URLSearchParams();
+    if (params?.cashSessionId) urlParams.append('cashSessionId', params.cashSessionId);
+    if (params?.storeId && params.storeId !== 'all') urlParams.append('storeId', params.storeId);
+    if (params?.type && params.type !== 'all') urlParams.append('type', params.type);
+    if (params?.paymentMethod && params.paymentMethod !== 'all')
+      urlParams.append('paymentMethod', params.paymentMethod);
+    if (params?.startDate) urlParams.append('startDate', params.startDate);
+    if (params?.endDate) urlParams.append('endDate', params.endDate);
+    if (params?.page) urlParams.append('page', String(params.page));
+    if (params?.limit) urlParams.append('limit', String(params.limit));
+    return request<{
+      items: CashMovement[];
+      pagination: { total: number; page: number; limit: number; totalPages: number };
+    }>(`/api/cash/movements?${urlParams.toString()}`);
+  },
+
+  getReceiptConfig: (storeId?: string) =>
+    request<ReceiptConfig>(
+      storeId && storeId !== 'all'
+        ? `/api/cash/receipt-config?storeId=${storeId}`
+        : '/api/cash/receipt-config',
+    ),
+
+  updateReceiptConfig: (data: Partial<ReceiptConfig>, storeId?: string) =>
+    request<ReceiptConfig>(
+      storeId && storeId !== 'all'
+        ? `/api/cash/receipt-config?storeId=${storeId}`
+        : '/api/cash/receipt-config',
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      },
+    ),
+
+  getSaleReceipt: (saleId: string) => request<Receipt>(`/api/sales/${saleId}/receipt`),
+
+  reprintSaleReceipt: (saleId: string) =>
+    request<Receipt>(`/api/sales/${saleId}/receipt/reprint`, {
       method: 'POST',
     }),
 };

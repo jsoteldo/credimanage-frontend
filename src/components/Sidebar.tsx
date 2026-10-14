@@ -1,6 +1,31 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, CurrentView } from '../types';
 import { hasPermission } from '../utils/permissions';
+
+export type AdminSubItemTab =
+  | 'audit'
+  | 'users'
+  | 'pending_payments'
+  | 'annulled'
+  | 'portfolio'
+  | 'messages'
+  | 'receipt-config';
+
+export interface AdminSubItemDef {
+  id: AdminSubItemTab;
+  label: string;
+  icon: string;
+}
+
+export const ADMIN_SUB_ITEMS: AdminSubItemDef[] = [
+  { id: 'audit', label: 'Bitácora de Auditoría', icon: 'receipt_long' },
+  { id: 'users', label: 'Usuarios del Sistema y Permisos', icon: 'manage_accounts' },
+  { id: 'pending_payments', label: 'Aprobación de Abonos', icon: 'pending_actions' },
+  { id: 'annulled', label: 'Operaciones Anuladas', icon: 'block' },
+  { id: 'portfolio', label: 'Consultas de Deuda & Saldos a Favor', icon: 'account_balance_wallet' },
+  { id: 'messages', label: 'Recordatorio de Cobranza', icon: 'chat' },
+  { id: 'receipt-config', label: 'Configuración de Boleta', icon: 'receipt_long' },
+];
 
 interface SidebarProps {
   currentView: CurrentView;
@@ -15,10 +40,12 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  adminTab?: 'audit' | 'users' | 'annulled' | 'portfolio' | 'pending_payments' | 'messages';
+  onSelectAdminTab?: (tab: 'audit' | 'users' | 'annulled' | 'portfolio' | 'pending_payments' | 'messages') => void;
 }
 
 interface NavItemDef {
-  id: CurrentView | 'import-modal' | 'messages-config';
+  id: CurrentView | 'import-modal';
   label: string;
   icon: string;
   adminOnly?: boolean;
@@ -44,12 +71,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   isMobileOpen = false,
   onCloseMobile,
+  adminTab = 'audit',
+  onSelectAdminTab,
 }) => {
+  const isInsideAdmin = currentView === 'admin' || currentView === 'receipt-config';
+  const [isAdminExpanded, setIsAdminExpanded] = useState<boolean>(isInsideAdmin);
+  const prevViewRef = useRef(currentView);
+
+  // Auto-expand Administration when navigating into any of its routes
+  useEffect(() => {
+    if (isInsideAdmin && prevViewRef.current !== currentView) {
+      setIsAdminExpanded(true);
+    }
+    prevViewRef.current = currentView;
+  }, [currentView, isInsideAdmin]);
+
   const handleNavClick = (item: NavItemDef) => {
     if (item.id === 'import-modal') {
       if (onOpenImportModal) onOpenImportModal();
-    } else if (item.id === 'messages-config') {
-      if (onOpenMessagesConfig) onOpenMessagesConfig();
     } else {
       setCurrentView(item.id as CurrentView);
     }
@@ -58,7 +97,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  const handleAdminSubItemClick = (subId: AdminSubItemTab) => {
+    if (subId === 'receipt-config') {
+      setCurrentView('receipt-config');
+    } else if (subId === 'messages') {
+      if (onSelectAdminTab) {
+        onSelectAdminTab('messages');
+      } else if (onOpenMessagesConfig) {
+        onOpenMessagesConfig();
+      } else {
+        setCurrentView('admin');
+      }
+    } else {
+      if (onSelectAdminTab) {
+        onSelectAdminTab(subId);
+      } else {
+        setCurrentView('admin');
+      }
+    }
+    if (onCloseMobile) {
+      onCloseMobile();
+    }
+  };
+
+  const isSubItemActive = (subId: AdminSubItemTab) => {
+    if (subId === 'receipt-config') {
+      return currentView === 'receipt-config';
+    }
+    if (currentView === 'admin') {
+      return (adminTab || 'audit') === subId;
+    }
+    return false;
+  };
+
   const navSections: NavSectionDef[] = [
+    {
+      title: 'Operaciones',
+      items: [
+        { id: 'sales', label: 'Ventas / POS', icon: 'point_of_sale', permission: 'sales.view' },
+        { id: 'cash', label: 'Caja & Turnos', icon: 'savings', permission: 'sales.view' },
+      ],
+    },
     {
       title: 'Crédito y Cartera',
       items: [
@@ -72,6 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Productos e Inventario',
       items: [
+        { id: 'inventory', label: 'Inventario', icon: 'warehouse', permission: 'inventory.view' },
         { id: 'products', label: 'Productos', icon: 'inventory_2', permission: 'product.view' },
         { id: 'departments', label: 'Departamentos', icon: 'category', permission: 'department.view' },
         { id: 'kits', label: 'Kits / Combos', icon: 'widgets', permission: 'kit.view' },
@@ -83,8 +163,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Configuración',
       items: [
         { id: 'locations', label: 'Tiendas / Almacenes', icon: 'store', permission: 'location.view' },
-        { id: 'admin', label: 'Administración', icon: 'admin_panel_settings', adminOnly: true },
-        { id: 'messages-config', label: 'Recordatorio WhatsApp', icon: 'chat', adminOnly: true, isAction: true },
       ],
     },
   ];
@@ -98,6 +176,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
     return true;
   };
+
+  const showAdminMenu = user && user.role === 'Administrador';
 
   return (
     <>
@@ -146,7 +226,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <nav className="flex-1 space-y-4 overflow-y-auto pr-1">
           {navSections.map((section, sIdx) => {
             const visibleItems = section.items.filter(isItemVisible);
-            if (visibleItems.length === 0) return null;
+            const isConfigSection = section.title === 'Configuración';
+            if (visibleItems.length === 0 && (!isConfigSection || !showAdminMenu)) return null;
 
             return (
               <div key={sIdx} className="space-y-1">
@@ -178,6 +259,114 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                   );
                 })}
+
+                {/* Administration Collapsible Group under Configuración */}
+                {isConfigSection && showAdminMenu && (
+                  isCollapsed ? (
+                    /* Collapsed mode: Icon with flyout on hover */
+                    <div className="relative group">
+                      <button
+                        onClick={() => {
+                          if (onToggleCollapse) onToggleCollapse();
+                          setIsAdminExpanded(true);
+                        }}
+                        title="Administración"
+                        className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 text-xs cursor-pointer ${
+                          isInsideAdmin
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold shadow-2xs'
+                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
+                        aria-label="Administración"
+                        data-testid="sidebar-admin-group-collapsed"
+                      >
+                        <span className="material-symbols-outlined text-[19px]">admin_panel_settings</span>
+                      </button>
+
+                      {/* Floating flyout menu */}
+                      <div className="absolute left-full top-0 ml-2 w-64 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl p-2 hidden group-hover:block z-50 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[14px] text-indigo-600">admin_panel_settings</span>
+                          <span>Administración</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {ADMIN_SUB_ITEMS.map((sub) => {
+                            const isActive = isSubItemActive(sub.id);
+                            return (
+                              <button
+                                key={sub.id}
+                                onClick={() => handleAdminSubItemClick(sub.id)}
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer text-left ${
+                                  isActive
+                                    ? 'bg-indigo-600 text-white font-semibold shadow-xs'
+                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                                }`}
+                              >
+                                <span className="material-symbols-outlined text-[16px]">{sub.icon}</span>
+                                <span className="truncate">{sub.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Expanded mode: Collapsible item with arrow and sub-items */
+                    <div className="space-y-1">
+                      <button
+                        onClick={() => setIsAdminExpanded((prev) => !prev)}
+                        className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl transition-all duration-200 text-xs cursor-pointer ${
+                          isInsideAdmin
+                            ? 'bg-indigo-50/80 text-indigo-700 font-bold border border-indigo-100/70 shadow-2xs'
+                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                        }`}
+                        aria-expanded={isAdminExpanded}
+                        data-testid="sidebar-admin-group-btn"
+                        title="Administración"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="material-symbols-outlined text-[19px]">admin_panel_settings</span>
+                          <span className="truncate">Administración</span>
+                        </div>
+                        <span
+                          className={`material-symbols-outlined text-[18px] text-slate-400 transition-transform duration-200 ${
+                            isAdminExpanded ? 'rotate-180 text-indigo-600' : ''
+                          }`}
+                        >
+                          expand_more
+                        </span>
+                      </button>
+
+                      {/* Sub-menu options */}
+                      <div
+                        className={`transition-all duration-200 ease-in-out overflow-hidden space-y-1 ${
+                          isAdminExpanded ? 'max-h-96 opacity-100 pt-0.5' : 'max-h-0 opacity-0'
+                        }`}
+                        data-testid="sidebar-admin-submenu"
+                      >
+                        <div className="pl-3 space-y-0.5 border-l-2 border-indigo-100 ml-4 my-0.5">
+                          {ADMIN_SUB_ITEMS.map((sub) => {
+                            const isActive = isSubItemActive(sub.id);
+                            return (
+                              <button
+                                key={sub.id}
+                                onClick={() => handleAdminSubItemClick(sub.id)}
+                                data-testid={`sidebar-admin-sub-${sub.id}`}
+                                className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs transition-colors cursor-pointer text-left ${
+                                  isActive
+                                    ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                                }`}
+                              >
+                                <span className="material-symbols-outlined text-[16px]">{sub.icon}</span>
+                                <span className="truncate">{sub.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                )}
               </div>
             );
           })}
@@ -294,7 +483,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <nav className="flex-1 space-y-4 overflow-y-auto">
               {navSections.map((section, sIdx) => {
                 const visibleItems = section.items.filter(isItemVisible);
-                if (visibleItems.length === 0) return null;
+                const isConfigSection = section.title === 'Configuración';
+                if (visibleItems.length === 0 && (!isConfigSection || !showAdminMenu)) return null;
 
                 return (
                   <div key={sIdx} className="space-y-1">
@@ -321,6 +511,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </button>
                       );
                     })}
+
+                    {/* Mobile Collapsible Administration Group */}
+                    {isConfigSection && showAdminMenu && (
+                      <div className="space-y-1">
+                        <button
+                          onClick={() => setIsAdminExpanded((prev) => !prev)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 text-xs cursor-pointer ${
+                            isInsideAdmin
+                              ? 'bg-indigo-50/80 text-indigo-700 font-bold border border-indigo-100/70 shadow-2xs'
+                              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          }`}
+                          aria-expanded={isAdminExpanded}
+                          data-testid="mobile-admin-group-btn"
+                          title="Administración"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+                            <span className="truncate">Administración</span>
+                          </div>
+                          <span
+                            className={`material-symbols-outlined text-[18px] text-slate-400 transition-transform duration-200 ${
+                              isAdminExpanded ? 'rotate-180 text-indigo-600' : ''
+                            }`}
+                          >
+                            expand_more
+                          </span>
+                        </button>
+
+                        <div
+                          className={`transition-all duration-200 ease-in-out overflow-hidden space-y-1 ${
+                            isAdminExpanded ? 'max-h-96 opacity-100 pt-0.5' : 'max-h-0 opacity-0'
+                          }`}
+                          data-testid="mobile-admin-submenu"
+                        >
+                          <div className="pl-3 space-y-0.5 border-l-2 border-indigo-100 ml-4 my-0.5">
+                            {ADMIN_SUB_ITEMS.map((sub) => {
+                              const isActive = isSubItemActive(sub.id);
+                              return (
+                                <button
+                                  key={sub.id}
+                                  onClick={() => handleAdminSubItemClick(sub.id)}
+                                  data-testid={`mobile-admin-sub-${sub.id}`}
+                                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs transition-colors cursor-pointer text-left ${
+                                    isActive
+                                      ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                                  }`}
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">{sub.icon}</span>
+                                  <span className="truncate">{sub.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

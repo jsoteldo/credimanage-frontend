@@ -2,20 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { User, AuditLog, CreditPurchase, Payment, Client } from '../types';
 import { api } from '../services/api';
 import { WhatsAppReminderConfigView } from './WhatsAppReminderConfigView';
+import { RolePermissionsModal } from './RolePermissionsModal';
 
 interface AdminPanelProps {
   currentUser: User | null;
   initialTab?: 'audit' | 'users' | 'annulled' | 'portfolio' | 'pending_payments' | 'messages';
-  onNavigateToClients: () => void;
-  onNavigateToReports: () => void;
+  onNavigateToClients?: () => void;
+  onNavigateToReports?: () => void;
   onViewStatement: (client: Client) => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   currentUser,
   initialTab = 'audit',
-  onNavigateToClients,
-  onNavigateToReports,
   onViewStatement,
 }) => {
   const [activeTab, setActiveTab] = useState<'audit' | 'users' | 'annulled' | 'portfolio' | 'pending_payments' | 'messages'>(initialTab);
@@ -38,6 +37,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // User form modal
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showRolesModal, setShowRolesModal] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<'Administrador' | 'Cajero' | 'Generico'>('Cajero');
@@ -140,114 +140,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   return (
     <div className="space-y-6 w-full">
-      {/* Header */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[24px]">shield_person</span>
-            </div>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-              Panel Administrativo
-            </h2>
-          </div>
-          <p className="text-xs font-medium text-slate-500 mt-1">
-            Control de usuarios, bitácora de operaciones sensibles, auditoría y cancelación de abonos.
-          </p>
-        </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={onNavigateToClients}
-            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer flex items-center gap-1.5 transition-colors shadow-2xs"
-          >
-            <span className="material-symbols-outlined text-[18px]">group</span>
-            Gestión Clientes
-          </button>
-          <button
-            onClick={onNavigateToReports}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-all shadow-xs"
-          >
-            <span className="material-symbols-outlined text-[18px]">analytics</span>
-            Reporte Saldos
-          </button>
-        </div>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="bg-slate-100/90 rounded-2xl p-1.5 flex flex-wrap gap-1 border border-slate-200/70">
-        <button
-          onClick={() => setActiveTab('audit')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-            activeTab === 'audit'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-200/70 font-semibold'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-          Bitácora de Auditoría ({auditLogs.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-            activeTab === 'users'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-200/70 font-semibold'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">manage_accounts</span>
-          Usuarios del Sistema y Permisos
-        </button>
-
-        <button
-          onClick={() => setActiveTab('pending_payments')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-            activeTab === 'pending_payments'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-200/70 font-semibold'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">pending_actions</span>
-          Aprobación de Abonos
-        </button>
-
-        <button
-          onClick={() => setActiveTab('annulled')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-            activeTab === 'annulled'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-200/70 font-semibold'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">block</span>
-          Operaciones Anuladas
-        </button>
-
-        <button
-          onClick={() => setActiveTab('portfolio')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-            activeTab === 'portfolio'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-200/70 font-semibold'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-          Consultas de Deuda & Saldos a Favor
-        </button>
-
-        <button
-          onClick={() => setActiveTab('messages')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-            activeTab === 'messages'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-200/70 font-semibold'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">chat</span>
-          Mensajes • Recordatorio de Cobranza
-        </button>
-      </div>
 
       {error && (
         <div className="p-3 bg-rose-50 text-rose-700 rounded-xl border border-rose-200 text-xs font-medium flex items-center gap-2">
@@ -340,13 +233,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 Configure roles de acceso al sistema POS, apruebe registros públicos y habilite/deshabilite cuentas.
               </p>
             </div>
-            <button
-              onClick={() => setShowAddUserModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            >
-              <span className="material-symbols-outlined text-[18px]">person_add</span>
-              Nuevo Usuario
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowRolesModal(true)}
+                className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              >
+                <span className="material-symbols-outlined text-[18px] text-indigo-600">shield</span>
+                Permisos por Rol
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddUserModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              >
+                <span className="material-symbols-outlined text-[18px]">person_add</span>
+                Nuevo Usuario
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -485,7 +389,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100">
                   <th className="py-3 px-5 text-xs font-bold uppercase tracking-wider text-slate-500">Fecha Anulación</th>
-                  <th className="py-3 px-5 text-xs font-bold uppercase tracking-wider text-slate-500">ID Abono</th>
                   <th className="py-3 px-5 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">Importe Revertido</th>
                   <th className="py-3 px-5 text-xs font-bold uppercase tracking-wider text-slate-500">Anulado Por</th>
                   <th className="py-3 px-5 text-xs font-bold uppercase tracking-wider text-slate-500">Motivo Especificado</th>
@@ -494,7 +397,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <tbody className="divide-y divide-slate-100 text-xs">
                 {annulledOps.annulledPayments.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-400 text-sm">
+                    <td colSpan={4} className="py-12 text-center text-slate-400 text-sm">
                       No hay abonos anulados en el historial.
                     </td>
                   </tr>
@@ -504,7 +407,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <td className="py-3 px-5 font-mono text-slate-500">
                         {p.annulledAt ? new Date(p.annulledAt).toLocaleString('es-PE') : 'N/A'}
                       </td>
-                      <td className="py-3 px-5 font-mono font-bold text-slate-900">{p.id}</td>
                       <td className="py-3 px-5 font-mono text-right font-black text-rose-600">
                         S/ {p.amount.toFixed(2)} PEN
                       </td>
@@ -821,6 +723,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* Role Permissions Matrix Modal */}
+      <RolePermissionsModal
+        isOpen={showRolesModal}
+        onClose={() => setShowRolesModal(false)}
+        onPermissionsUpdated={() => {
+          loadAdminData();
+        }}
+      />
     </div>
   );
 };

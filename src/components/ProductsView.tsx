@@ -90,14 +90,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         subtitle="Administra artículos unitarios, ventas a granel y combos compuestos."
         actions={
           <>
-            <button
-              onClick={onRefreshData}
-              className="p-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-2xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-              title="Recargar catálogo"
-            >
-              <span className="material-symbols-outlined text-[18px]">refresh</span>
-            </button>
-
             {allowImport && (
               <button
                 onClick={onOpenImportModal}

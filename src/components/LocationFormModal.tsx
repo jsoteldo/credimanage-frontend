@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Location, LocationType } from '../types';
+import { Location, LocationType, User } from '../types';
+import { StoreCashRegistersTab } from './cash/StoreCashRegistersTab';
 
 interface LocationFormModalProps {
   isOpen: boolean;
@@ -9,6 +10,8 @@ interface LocationFormModalProps {
   onDeactivateLocation?: (location: Location) => Promise<void>;
   onReactivateLocation?: (location: Location) => Promise<void>;
   zIndexClass?: string;
+  currentUser?: User | null;
+  initialTab?: 'details' | 'registers';
 }
 
 export const LocationFormModal: React.FC<LocationFormModalProps> = ({
@@ -19,7 +22,10 @@ export const LocationFormModal: React.FC<LocationFormModalProps> = ({
   onDeactivateLocation,
   onReactivateLocation,
   zIndexClass = 'z-50',
+  currentUser,
+  initialTab = 'details',
 }) => {
+  const [activeTab, setActiveTab] = useState<'details' | 'registers'>('details');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [type, setType] = useState<LocationType>('STORE');
@@ -33,14 +39,16 @@ export const LocationFormModal: React.FC<LocationFormModalProps> = ({
       setCode(initialLocation.code || '');
       setType(initialLocation.type);
       setAddress(initialLocation.address || '');
+      setActiveTab(initialTab);
     } else {
       setName('');
       setCode('');
       setType('STORE');
       setAddress('');
+      setActiveTab('details');
     }
     setError(null);
-  }, [initialLocation, isOpen]);
+  }, [initialLocation, isOpen, initialTab]);
 
   if (!isOpen) return null;
 
@@ -68,22 +76,29 @@ export const LocationFormModal: React.FC<LocationFormModalProps> = ({
     }
   };
 
+  const isStore = (initialLocation ? initialLocation.type : type) === 'STORE';
+  const showTabs = !!initialLocation && isStore;
+
   return (
     <div className={`fixed inset-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm ${zIndexClass}`}>
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 flex flex-col animate-in fade-in zoom-in-95 duration-200">
-        <div className="p-6 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100 flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
+        {/* Modal Header */}
+        <div className="p-6 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
               <span className="material-symbols-outlined text-[22px]">store</span>
             </div>
             <div>
               <h3 className="font-extrabold text-slate-900 text-lg leading-tight">
-                {initialLocation ? 'Editar Ubicación' : 'Nueva Ubicación'}
+                {initialLocation ? `Gestionar: ${initialLocation.name}` : 'Nueva Ubicación'}
               </h3>
-              <p className="text-xs text-slate-500 font-medium">Tienda o Almacén central</p>
+              <p className="text-xs text-slate-500 font-medium">
+                {initialLocation?.type === 'STORE' ? 'Tienda / Punto de venta' : 'Almacén o Tienda central'}
+              </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
           >
@@ -91,7 +106,45 @@ export const LocationFormModal: React.FC<LocationFormModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Tab Navigation for Stores */}
+        {showTabs && (
+          <div className="flex border-b border-slate-200 bg-slate-50/40 px-6 shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('details')}
+              className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'details'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">info</span>
+              <span>Datos Generales</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('registers')}
+              className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'registers'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">point_of_sale</span>
+              <span>Cajas</span>
+            </button>
+          </div>
+        )}
+
+        {/* Modal Content */}
+        <div className="overflow-y-auto flex-1 p-6">
+          {activeTab === 'registers' && initialLocation ? (
+            <StoreCashRegistersTab
+              store={initialLocation}
+              currentUser={currentUser || null}
+            />
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
               <span className="material-symbols-outlined text-[18px]">error</span>
@@ -248,7 +301,21 @@ export const LocationFormModal: React.FC<LocationFormModalProps> = ({
             </div>
           </div>
         </form>
-      </div>
+      )}
     </div>
+
+    {activeTab === 'registers' && (
+      <div className="p-4 border-t border-slate-100 bg-slate-50/80 flex justify-end shrink-0">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+        >
+          Cerrar
+        </button>
+      </div>
+    )}
+  </div>
+</div>
   );
 };

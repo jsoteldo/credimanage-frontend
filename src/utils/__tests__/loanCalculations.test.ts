@@ -117,7 +117,7 @@ describe('Financial Logic Characterization (loanCalculations.ts)', () => {
         interestRate: 10,
         installmentsCount: 1,
         frequency: 'Mensual',
-        firstDueDate: '2026-10-01',
+        firstDueDate: '2027-10-01',
       });
 
       expect(result.capital).toBe(1000);
@@ -129,7 +129,7 @@ describe('Financial Logic Characterization (loanCalculations.ts)', () => {
       expect(result.installments).toHaveLength(1);
       expect(result.installments[0]).toEqual({
         installmentNumber: 1,
-        dueDate: '2026-10-01',
+        dueDate: '2027-10-01',
         capital: 1000,
         interest: 100,
         amount: 1100,

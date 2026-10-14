@@ -45,14 +45,6 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
         subtitle="Gestión de contactos de proveedores para compras y recepciones futuras."
         actions={
           <>
-            <button
-              onClick={onRefreshData}
-              className="p-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-2xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-              title="Recargar proveedores"
-            >
-              <span className="material-symbols-outlined text-[18px]">refresh</span>
-            </button>
-
             {allowManage && (
               <button
                 onClick={onNewSupplier}

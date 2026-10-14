@@ -30,6 +30,10 @@ import { SupplierFormModal } from './components/SupplierFormModal';
 import { LocationsView } from './components/LocationsView';
 import { LocationFormModal } from './components/LocationFormModal';
 import { KitsView } from './components/KitsView';
+import { InventoryView } from './components/InventoryView';
+import { SalesView } from './components/sales/SalesView';
+import { CashView } from './components/cash/CashView';
+import { ReceiptConfigView } from './components/cash/ReceiptConfigView';
 
 export default function App() {
   // Auth State
@@ -49,8 +53,8 @@ export default function App() {
       const path = window.location.pathname;
       setPathname(path);
       const viewName = path.replace('/', '') || 'dashboard';
-      if (['dashboard', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings', 'products', 'departments', 'kits', 'suppliers', 'locations'].includes(viewName)) {
-        if (viewName === 'admin' && currentUser && currentUser.role !== 'Administrador') {
+      if (['dashboard', 'sales', 'cash', 'receipt-config', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings', 'inventory', 'products', 'departments', 'kits', 'suppliers', 'locations'].includes(viewName)) {
+        if ((viewName === 'admin' || viewName === 'receipt-config') && currentUser && currentUser.role !== 'Administrador') {
           window.history.replaceState({}, '', '/clients');
           setPathname('/clients');
           setCurrentView('clients');
@@ -158,8 +162,8 @@ export default function App() {
           } else {
             // sync view name based on path
             const viewName = window.location.pathname.replace('/', '') || 'dashboard';
-            if (['dashboard', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings', 'products', 'departments', 'kits', 'suppliers', 'locations'].includes(viewName)) {
-              if (viewName === 'admin' && user.role !== 'Administrador') {
+            if (['dashboard', 'sales', 'cash', 'receipt-config', 'clients', 'debt', 'bank', 'reports', 'admin', 'settings', 'inventory', 'products', 'departments', 'kits', 'suppliers', 'locations'].includes(viewName)) {
+              if ((viewName === 'admin' || viewName === 'receipt-config') && user.role !== 'Administrador') {
                 window.history.replaceState({}, '', '/clients');
                 setPathname('/clients');
                 setCurrentView('clients');
@@ -338,14 +342,28 @@ export default function App() {
   };
 
   // Locations Handlers
+  const [locationModalInitialTab, setLocationModalInitialTab] = useState<'details' | 'registers'>('details');
+
   const handleOpenNewLocation = () => {
     setSelectedLocationForEdit(null);
+    setLocationModalInitialTab('details');
     setShowLocationFormModal(true);
   };
 
-  const handleOpenEditLocation = (location: Location) => {
+  const handleOpenEditLocation = (location: Location, tab: 'details' | 'registers' = 'details') => {
     setSelectedLocationForEdit(location);
+    setLocationModalInitialTab(tab);
     setShowLocationFormModal(true);
+  };
+
+  const handleNavigateToStoreRegisters = (storeId: string) => {
+    const store = locations.find((l) => l.id === storeId);
+    if (store) {
+      setSelectedLocationForEdit(store);
+      setLocationModalInitialTab('registers');
+      setShowLocationFormModal(true);
+      setCurrentView('locations');
+    }
   };
 
   const handleSaveLocation = async (locationData: Partial<Location>) => {
@@ -698,6 +716,12 @@ export default function App() {
             setCurrentView(view);
           }
         }}
+        adminTab={adminInitialTab}
+        onSelectAdminTab={(tab) => {
+          setAdminInitialTab(tab);
+          navigate('/admin');
+          setCurrentView('admin');
+        }}
         user={currentUser}
         onLogout={handleLogout}
         onExportData={handleExportDataCSV}
@@ -836,6 +860,46 @@ export default function App() {
             />
           )}
 
+          {/* VIEW: Ventas / POS (Etapa 2) */}
+          {currentView === 'sales' && (
+            <SalesView
+              locations={locations}
+              products={products}
+              clients={clients}
+              currentUser={currentUser}
+              onRefreshData={() => {
+                loadData();
+                loadProductDomainData();
+              }}
+              onNavigateToStoreRegisters={handleNavigateToStoreRegisters}
+            />
+          )}
+
+          {/* VIEW: Caja y Turnos (Etapa 3) */}
+          {currentView === 'cash' && (
+            <CashView
+              currentUser={currentUser}
+              stores={locations.filter((l) => l.active && (l.type === 'STORE' || !l.type))}
+              onNavigateToStoreRegisters={handleNavigateToStoreRegisters}
+            />
+          )}
+
+          {/* VIEW: Configuración de Boleta Simple (Etapa 3) */}
+          {currentView === 'receipt-config' && (
+            <ReceiptConfigView currentUser={currentUser} />
+          )}
+
+          {/* VIEW: Inventory Multi-Store (Etapa 1) */}
+          {currentView === 'inventory' && (
+            <InventoryView
+              locations={locations}
+              products={products}
+              departments={departments}
+              currentUser={currentUser}
+              onRefreshData={loadProductDomainData}
+            />
+          )}
+
           {/* VIEW: Products Catalog */}
           {currentView === 'products' && (
             <ProductsView
@@ -868,12 +932,19 @@ export default function App() {
           {currentView === 'departments' && (
             <DepartmentsView
               departments={departments}
+              products={products}
               currentUser={currentUser}
               onNewDepartment={handleOpenNewDepartment}
               onEditDepartment={handleOpenEditDepartment}
               onDeactivateDepartment={(d) => handleDeactivateDepartment(d.id)}
               onReactivateDepartment={(d) => handleReactivateDepartment(d.id)}
               onRefreshData={loadProductDomainData}
+              onEditProduct={handleOpenEditProduct}
+              onNewProduct={handleOpenNewProduct}
+              onNavigateToProducts={() => {
+                navigate('/products');
+                setCurrentView('products');
+              }}
             />
           )}
 
@@ -900,6 +971,7 @@ export default function App() {
               onDeactivateLocation={(l) => handleDeactivateLocation(l.id)}
               onReactivateLocation={(l) => handleReactivateLocation(l.id)}
               onRefreshData={loadProductDomainData}
+              onOpenStoreRegisters={(loc) => handleOpenEditLocation(loc, 'registers')}
             />
           )}
         </main>
@@ -1162,11 +1234,16 @@ export default function App() {
       {/* Location Form Modal */}
       <LocationFormModal
         isOpen={showLocationFormModal}
-        onClose={() => setShowLocationFormModal(false)}
+        onClose={() => {
+          setShowLocationFormModal(false);
+          loadProductDomainData();
+        }}
         onSave={handleSaveLocation}
         initialLocation={selectedLocationForEdit}
         onDeactivateLocation={(l) => handleDeactivateLocation(l.id)}
         onReactivateLocation={(l) => handleReactivateLocation(l.id)}
+        currentUser={currentUser}
+        initialTab={locationModalInitialTab}
       />
 
       {/* Settings Modal */}

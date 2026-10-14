@@ -19,7 +19,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onSave,
   initialProduct,
   departments,
-  availableComponentProducts,
+  availableComponentProducts = [],
   onDeactivateProduct,
   onReactivateProduct,
   zIndexClass = 'z-50',
@@ -163,8 +163,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           return;
         }
         const q = Number(comp.quantity);
-        if (isNaN(q) || q <= 0) {
-          setError('La cantidad de cada componente debe ser mayor a 0');
+        if (isNaN(q) || q <= 0 || !Number.isInteger(q)) {
+          setError('La cantidad de inventario debe ser un número entero.');
+          return;
+        }
+      }
+    } else {
+      if (defaultMinStock !== '') {
+        const minVal = Number(defaultMinStock);
+        if (isNaN(minVal) || minVal < 0 || !Number.isInteger(minVal)) {
+          setError('La cantidad de inventario debe ser un número entero.');
           return;
         }
       }
@@ -310,10 +318,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label htmlFor="product-sale-type" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Tipo de Venta
                 </label>
                 <select
+                  id="product-sale-type"
                   value={saleType}
                   onChange={(e) => setSaleType(e.target.value as ProductSaleType)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
@@ -406,7 +415,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     </label>
                     <input
                       type="number"
-                      step={saleType === 'WEIGHT' ? '0.001' : '1'}
+                      step="1"
                       min="0"
                       value={defaultMinStock}
                       onChange={(e) => setDefaultMinStock(e.target.value)}
@@ -490,8 +499,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Cant:</span>
                               <input
                                 type="number"
-                                step="0.001"
-                                min="0.001"
+                                step="1"
+                                min="1"
                                 value={comp.quantity}
                                 onChange={(e) =>
                                   handleComponentChange(idx, 'quantity', e.target.value)
