@@ -36,7 +36,34 @@ export const getAuthToken = (): string | null => localStorage.getItem(TOKEN_KEY)
 export const setAuthToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
 export const removeAuthToken = () => localStorage.removeItem(TOKEN_KEY);
 
-const BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
+/**
+ * Resolución dinámica de la URL del Backend:
+ * - En Local: Toma VITE_API_URL de .env.local o .env.development (ej. http://localhost:3001/crediApi).
+ * - En Vercel: Toma la variable de entorno VITE_API_URL configurada en el panel de Vercel (Project Settings -> Environment Variables).
+ * - Fallbacks seguros: En modo desarrollo local usa http://localhost:3001/crediApi, en producción usa /api.
+ */
+function getBaseUrl(): string {
+  const envUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined)?.trim();
+  if (envUrl) {
+    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+  }
+  if ((import.meta as any).env?.DEV) {
+    return 'http://localhost:3001/crediApi';
+  }
+  return '/api';
+}
+
+const BASE_URL = getBaseUrl();
+
+function buildUrl(endpoint: string): string {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (BASE_URL === '/api') {
+    return cleanEndpoint.startsWith('/api') ? cleanEndpoint : `/api${cleanEndpoint}`;
+  }
+  // Remueve el prefijo /api si el endpoint ya lo incluye para evitar /crediApi/api/...
+  const cleanPath = cleanEndpoint.replace(/^\/api(?=\/|$)/, '');
+  return `${BASE_URL}${cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`}`;
+}
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
@@ -49,36 +76,59 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Use base URL (relative by default, allowing local Vite proxy or Vercel rewrites to handle the proxying)
-  const url = endpoint.startsWith('/api')
-    ? `${BASE_URL}${endpoint.replace(/^\/api/, '')}`
-    : `${BASE_URL}${endpoint}`;
+  const url = buildUrl(endpoint);
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (networkError: any) {
+    const err = new Error(
+      'No se pudo conectar con el servidor backend. Por favor verifica tu conexión o el estado del servicio.'
+    ) as Error & { status?: number; isNetworkError?: boolean };
+    err.isNetworkError = true;
+    throw err;
+  }
 
-  const data = await res.json();
+  let data: any = null;
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+  }
 
   if (!res.ok) {
-    let errorMsg = data.message || data.error || 'Ocurrió un error en la solicitud';
+    let errorMsg = data?.message || data?.error;
     if (Array.isArray(errorMsg)) {
       errorMsg = errorMsg.join(', ');
     }
-    // Prevent raw HTTP exception messages if generic
-    if (res.status === 401 && (errorMsg === 'Unauthorized' || !errorMsg)) {
-      errorMsg = 'Sesión expirada o no autenticado. Por favor inicie sesión nuevamente.';
-    } else if (res.status === 403 && (errorMsg === 'Forbidden' || !errorMsg)) {
-      errorMsg = 'No tienes permiso para realizar esta operación.';
+
+    if (!errorMsg) {
+      if (res.status === 401) {
+        errorMsg = 'Credenciales incorrectas o sesión expirada. Por favor inicie sesión nuevamente.';
+      } else if (res.status === 403) {
+        errorMsg = 'Acceso denegado (403 Forbidden). Verifica los permisos del backend en Cloud Run.';
+      } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+        errorMsg = 'El servidor backend no está disponible temporalmente (503/502). Inténtalo de nuevo en unos momentos.';
+      } else if (res.status === 404) {
+        errorMsg = 'El recurso solicitado no fue encontrado en el servidor (404).';
+      } else {
+        errorMsg = `Error en el servidor (${res.status} ${res.statusText || ''})`.trim();
+      }
     }
+
     const err = new Error(errorMsg) as Error & { status?: number; statusCode?: number };
     err.status = res.status;
     err.statusCode = res.status;
     throw err;
   }
 
-  return data as T;
+  return (data !== null ? data : {}) as T;
 }
 
 export const api = {

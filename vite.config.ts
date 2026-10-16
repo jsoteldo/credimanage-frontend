@@ -1,9 +1,14 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const rawApiUrl = env.VITE_API_URL || 'http://localhost:3001/crediApi';
+  // Remover sufijo /crediApi para obtener el host base del proxy
+  const proxyTarget = rawApiUrl.replace(/\/crediApi\/?$/, '') || 'http://localhost:3001';
+
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -21,7 +26,7 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/api': {
-          target: 'https://credimanage-vdq7ahdckq-rj.a.run.app',
+          target: proxyTarget,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, '/crediApi'),
         },
