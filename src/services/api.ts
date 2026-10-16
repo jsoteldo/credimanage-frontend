@@ -43,9 +43,16 @@ export const removeAuthToken = () => localStorage.removeItem(TOKEN_KEY);
  * - Fallbacks seguros: En modo desarrollo local usa http://localhost:3001/crediApi, en producción usa /api.
  */
 function getBaseUrl(): string {
-  const envUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined)?.trim();
+  let envUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined)?.trim();
   if (envUrl) {
-    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+    // Remover barra final si existe
+    envUrl = envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+
+    // Si es una URL completa (http:// o https://) y no termina en /crediApi, agregar automáticamente /crediApi
+    if (/^https?:\/\//i.test(envUrl) && !envUrl.endsWith('/crediApi')) {
+      envUrl = `${envUrl}/crediApi`;
+    }
+    return envUrl;
   }
   if ((import.meta as any).env?.DEV) {
     return 'http://localhost:3001/crediApi';
