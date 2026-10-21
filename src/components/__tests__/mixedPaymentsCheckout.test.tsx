@@ -217,7 +217,7 @@ describe('CheckoutModal - Pruebas Funcionales de Pagos Mixtos y Resumen', () => 
     });
   });
 
-  // 5. Pago insuficiente (Ejemplo 3: Efectivo S/ 15 + Yape S/ 4 -> Total S/ 19, Faltan S/ 5)
+  // 5. Pago insuficiente
   it('5. Pago insuficiente muestra "Faltan S/ 5.00 por asignar" y deshabilita confirmación', () => {
     render(
       <CheckoutModal
@@ -231,18 +231,13 @@ describe('CheckoutModal - Pruebas Funcionales de Pagos Mixtos y Resumen', () => 
       />,
     );
 
-    // Efectivo: 15
+    // Efectivo: 19 (faltan 5.00 para 24.00)
     const firstAmountInput = screen.getByLabelText(/Monto de pago 1/i);
-    fireEvent.change(firstAmountInput, { target: { value: '15' } });
-
-    // Agregar segundo método
-    fireEvent.click(screen.getByText(/Agregar otro medio/i));
-    const secondAmountInput = screen.getByLabelText(/Monto de pago 2/i);
-    fireEvent.change(secondAmountInput, { target: { value: '4' } });
+    fireEvent.change(firstAmountInput, { target: { value: '19' } });
 
     // Total asignado: 19, Faltan: 5
     expect(screen.getByText(/Faltan S\/ 5.00 por asignar/i)).toBeInTheDocument();
-    expect(screen.getByText('S/ 19.00')).toBeInTheDocument();
+    expect(screen.getAllByText('S/ 19.00').length).toBeGreaterThan(0);
 
     const confirmBtn = screen.getByRole('button', { name: /Confirmar Venta/i });
     expect(confirmBtn).toBeDisabled();
@@ -262,21 +257,19 @@ describe('CheckoutModal - Pruebas Funcionales de Pagos Mixtos y Resumen', () => 
       />,
     );
 
-    // Efectivo: 20
-    const firstAmountInput = screen.getByLabelText(/Monto de pago 1/i);
-    fireEvent.change(firstAmountInput, { target: { value: '20' } });
-
-    // Agregar Yape (4)
+    // Efectivo empieza en 24; agregar Yape y fijarlo en 4 -> Efectivo se autoajusta a 20
     fireEvent.click(screen.getByText(/Agregar otro medio/i));
+    const secondAmountInput = screen.getByLabelText(/Monto de pago 2/i);
+    fireEvent.change(secondAmountInput, { target: { value: '4' } });
     expect(screen.getByText('Monto exacto cubierto')).toBeInTheDocument();
 
     // Eliminar el segundo método (Yape)
     const deleteButtons = screen.getAllByTitle(/Eliminar este pago/i);
     fireEvent.click(deleteButtons[1]);
 
-    // Ahora solo queda Efectivo 20, faltan 4
-    expect(screen.getByText(/Faltan S\/ 4.00 por asignar/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Confirmar Venta/i })).toBeDisabled();
+    // Ahora Efectivo (residual) absorbe la diferencia y vuelve automáticamente a 24.00
+    expect(screen.getByText('Monto exacto cubierto')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Confirmar Venta/i })).not.toBeDisabled();
   });
 
   // 7. Modificación de importes en tiempo real
@@ -318,19 +311,17 @@ describe('CheckoutModal - Pruebas Funcionales de Pagos Mixtos y Resumen', () => 
       />,
     );
 
-    // Efectivo: 10
-    const firstAmountInput = screen.getByLabelText(/Monto de pago 1/i);
-    fireEvent.change(firstAmountInput, { target: { value: '10' } });
-
-    // Agregar Yape: 8
+    // Agregar Yape: 8 -> Efectivo autoajusta a 16
     fireEvent.click(screen.getByText(/Agregar otro medio/i));
     const secondAmountInput = screen.getByLabelText(/Monto de pago 2/i);
     fireEvent.change(secondAmountInput, { target: { value: '8' } });
 
-    // Agregar Tarjeta: 6
+    // Agregar Tarjeta: 6 -> Efectivo autoajusta a 10
     fireEvent.click(screen.getByText(/Agregar otro medio/i));
     const thirdMethodSelect = screen.getAllByRole('combobox')[2];
     fireEvent.change(thirdMethodSelect, { target: { value: 'CARD' } });
+    const thirdAmountInput = screen.getByLabelText(/Monto de pago 3/i);
+    fireEvent.change(thirdAmountInput, { target: { value: '6' } });
 
     // Total asignado: 10 + 8 + 6 = 24
     expect(screen.getByText('Monto exacto cubierto')).toBeInTheDocument();

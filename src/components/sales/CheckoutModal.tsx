@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Client, Location, SalePaymentMethod, CreateSalePayload, CashSession } from '../../types';
-import { formatCurrency } from '../../utils/loanCalculations';
+import { formatCurrency, round2 } from '../../utils/loanCalculations';
 
 interface CartItem {
   productId: string;
@@ -58,6 +58,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return [{ method: 'CASH', amount: total }];
   });
 
+  // Index of the method currently acting as residual for autoajuste
+  const [residualIndex, setResidualIndex] = useState<number>(0);
+
   // Cash received state
   const [cashReceivedInput, setCashReceivedInput] = useState<string>('');
   const [isCashReceivedDirty, setIsCashReceivedDirty] = useState<boolean>(false);
@@ -87,11 +90,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Computed sums (Real-time update)
   const paymentSum = useMemo(() => {
-    return Math.round(payments.reduce((sum, p) => sum + (parseAmount(p.amount) || 0), 0) * 100) / 100;
+    return round2(payments.reduce((sum, p) => sum + (parseAmount(p.amount) || 0), 0));
   }, [payments]);
 
   const difference = useMemo(() => {
-    return Math.round((total - paymentSum) * 100) / 100;
+    return round2(total - paymentSum);
   }, [total, paymentSum]);
 
   const hasCashPayment = useMemo(() => {
@@ -99,36 +102,36 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }, [payments]);
 
   const totalCashAmount = useMemo(() => {
-    return Math.round(
+    return round2(
       payments
         .filter((p) => p.method === 'CASH')
-        .reduce((sum, p) => sum + (parseAmount(p.amount) || 0), 0) * 100
-    ) / 100;
+        .reduce((sum, p) => sum + (parseAmount(p.amount) || 0), 0)
+    );
   }, [payments]);
 
   const totalCreditAmount = useMemo(() => {
-    return Math.round(
+    return round2(
       payments
         .filter((p) => p.method === 'CREDIT')
-        .reduce((sum, p) => sum + (parseAmount(p.amount) || 0), 0) * 100
-    ) / 100;
+        .reduce((sum, p) => sum + (parseAmount(p.amount) || 0), 0)
+    );
   }, [payments]);
 
   // Card Surcharge (5% applied ONLY on payments made with CARD)
   const cardAmount = useMemo(() => {
-    return Math.round(
+    return round2(
       payments
         .filter((p) => p.method === 'CARD')
-        .reduce((sum, p) => sum + (parseAmount(p.amount) || 0), 0) * 100
-    ) / 100;
+        .reduce((sum, p) => sum + (parseAmount(p.amount) || 0), 0)
+    );
   }, [payments]);
 
   const cardSurcharge = useMemo(() => {
-    return Math.round(cardAmount * 0.05 * 100) / 100;
+    return round2(cardAmount * 0.05);
   }, [cardAmount]);
 
   const finalTotal = useMemo(() => {
-    return Math.round((total + cardSurcharge) * 100) / 100;
+    return round2(total + cardSurcharge);
   }, [total, cardSurcharge]);
 
   // Effective cash received: if not dirty, defaults to totalCashAmount; else uses input value
@@ -138,14 +141,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
     if (cashReceivedInput === '') return 0;
     const parsed = parseFloat(cashReceivedInput);
-    return isNaN(parsed) ? 0 : parsed;
+    return isNaN(parsed) ? 0 : round2(parsed);
   }, [isCashReceivedDirty, totalCashAmount, cashReceivedInput]);
 
   // Cash change: ONLY from cash received minus cash applied to sale
   const cashChange = useMemo(() => {
     if (!hasCashPayment || totalCashAmount <= 0) return 0;
     return effectiveCashReceived >= totalCashAmount
-      ? Math.round((effectiveCashReceived - totalCashAmount) * 100) / 100
+      ? round2(effectiveCashReceived - totalCashAmount)
       : 0;
   }, [hasCashPayment, totalCashAmount, effectiveCashReceived]);
 
@@ -212,11 +215,44 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     });
   };
 
-  // Handle amount change for a row
+  // Handle amount change for a row with intelligent autoajuste
   const handleAmountChange = (index: number, val: number | string) => {
     setPayments((prev) => {
+      // If there's only 1 payment row, update directly
+      if (prev.length <= 1) {
+        const next = [...prev];
+        next[index] = { ...next[index], amount: val };
+        return next;
+      }
+
+      // Determine which row acts as residual
+      // Rule: Never adjust the field the user is currently editing (index)
+      let targetResidualIndex = residualIndex;
+      if (targetResidualIndex === index || targetResidualIndex >= prev.length) {
+        // User is editing the current residual row: shift residual to another row
+        targetResidualIndex = index === 0 ? prev.length - 1 : 0;
+        setResidualIndex(targetResidualIndex);
+      }
+
+      // Update the edited row with user's value
       const next = [...prev];
       next[index] = { ...next[index], amount: val };
+
+      // Calculate sum of all rows except the target residual row
+      const otherSum = next.reduce((sum, p, i) => {
+        if (i === targetResidualIndex) return sum;
+        return round2(sum + (parseAmount(p.amount) || 0));
+      }, 0);
+
+      // Compute new residual amount: total - otherSum, clamped to min 0 (avoiding negative)
+      const rawResidual = round2(total - otherSum);
+      const newResidualAmount = Math.max(0, rawResidual);
+
+      next[targetResidualIndex] = {
+        ...next[targetResidualIndex],
+        amount: newResidualAmount,
+      };
+
       return next;
     });
   };
@@ -245,11 +281,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     ]);
   };
 
-  // Remove payment row
+  // Remove payment row with automatic residual absorption
   const handleRemovePaymentRow = (index: number) => {
     if (payments.length <= 1) return;
     setPayments((prev) => {
       const next = prev.filter((_, idx) => idx !== index);
+
+      // Recalculate residual index
+      let newResidualIndex = residualIndex;
+      if (index === residualIndex || newResidualIndex >= next.length) {
+        newResidualIndex = 0;
+      } else if (index < residualIndex) {
+        newResidualIndex = residualIndex - 1;
+      }
+      setResidualIndex(newResidualIndex);
+
+      // Residual row absorbs difference
+      const otherSum = next.reduce((sum, p, i) => {
+        if (i === newResidualIndex) return sum;
+        return round2(sum + (parseAmount(p.amount) || 0));
+      }, 0);
+
+      const rawResidual = round2(total - otherSum);
+      next[newResidualIndex] = {
+        ...next[newResidualIndex],
+        amount: Math.max(0, rawResidual),
+      };
+
       const stillHasCash = next.some((p) => p.method === 'CASH');
       if (!stillHasCash) {
         setIsCashReceivedDirty(false);
@@ -262,11 +320,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   // Quick fill remaining
   const handleFillRemaining = (index: number) => {
     const otherSum = payments.reduce(
-      (acc, p, idx) => (idx === index ? acc : acc + parseAmount(p.amount)),
+      (acc, p, idx) => (idx === index ? acc : round2(acc + (parseAmount(p.amount) || 0))),
       0,
     );
-    const need = Math.max(0, Math.round((total - otherSum) * 100) / 100);
-    handleAmountChange(index, need);
+    const need = Math.max(0, round2(total - otherSum));
+    setPayments((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], amount: need };
+      return next;
+    });
+    setResidualIndex(index);
   };
 
   // Submission handler
@@ -537,6 +600,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       <input
                         type="number"
                         step="0.01"
+                        min="0"
                         value={row.amount}
                         onChange={(e) => handleAmountChange(idx, e.target.value)}
                         placeholder="0.00"
@@ -626,6 +690,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Faltante / Exceso alert row (only when difference !== 0) */}
+            {difference !== 0 && (
+              <div className="flex items-center justify-between bg-rose-50/80 px-3 py-2 rounded-xl border border-rose-200 text-xs">
+                <span className="text-rose-700 font-semibold text-[11px] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[15px]">
+                    {difference > 0 ? 'error' : 'warning'}
+                  </span>
+                  <span>{difference > 0 ? 'Faltante por asignar:' : 'Exceso por asignar:'}</span>
+                </span>
+                <span className="font-mono font-black text-rose-700">
+                  {formatCurrency(Math.abs(difference))}
+                </span>
+              </div>
+            )}
 
             {/* Card Surcharge Breakdown (when card payments exist) */}
             {cardSurcharge > 0 && (
